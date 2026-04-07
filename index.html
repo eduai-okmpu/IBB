@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhysicsAccess - Баршаға арналған физика</title>
+    <meta name="description" content="Көру қабілеті бұзылған жандарға арналған инклюзивті физикалық білім беру платформасы.">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Global CSS -->
+    <link rel="stylesheet" href="style.css">
+    
+    <style>
+        /* Specific animations for Hero */
+        .hero-animation {
+            width: 500px;
+            height: 500px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: translateX(40px); /* Move slightly to the right */
+        }
+        
+        .atom {
+            position: relative;
+            width: 200px;
+            height: 200px;
+        }
+        
+        .nucleus {
+            width: 60px;
+            height: 60px;
+            background: radial-gradient(circle, #fff 0%, #3182CE 70%);
+            border-radius: 50%;
+            box-shadow: 0 0 40px rgba(49, 130, 206, 0.4);
+            position: absolute;
+            top: 70px;
+            left: 70px;
+            z-index: 2;
+        }
+        
+        .orbit {
+            position: absolute;
+            border: 1.5px solid rgba(49, 130, 206, 0.15);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .orbit-1 { 
+            width: 320px; height: 120px; 
+            border-color: rgba(229, 62, 62, 0.3);
+            transform: translate(-50%, -50%) rotate(0deg); 
+            animation: rotateOrbit1 4s linear infinite; 
+        }
+        .orbit-2 { 
+            width: 320px; height: 120px; 
+            border-color: rgba(49, 130, 206, 0.3);
+            transform: translate(-50%, -50%) rotate(120deg); 
+            animation: rotateOrbit2 5s linear infinite; 
+        }
+        .orbit-3 { 
+            width: 320px; height: 120px; 
+            border-color: rgba(128, 90, 213, 0.3);
+            transform: translate(-50%, -50%) rotate(240deg); 
+            animation: rotateOrbit3 6s linear infinite; 
+        }
+        
+        @keyframes rotateOrbit1 { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
+        @keyframes rotateOrbit2 { from { transform: translate(-50%, -50%) rotate(120deg); } to { transform: translate(-50%, -50%) rotate(480deg); } }
+        @keyframes rotateOrbit3 { from { transform: translate(-50%, -50%) rotate(240deg); } to { transform: translate(-50%, -50%) rotate(600deg); } }
+        
+        .electron {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            position: absolute;
+            top: -6px;
+            left: 50%;
+        }
+        
+        .orbit-1 .electron { background: #E53E3E; box-shadow: 0 0 15px #E53E3E; }
+        .orbit-2 .electron { background: #3182CE; box-shadow: 0 0 15px #3182CE; }
+        .orbit-3 .electron { background: #805AD5; box-shadow: 0 0 15px #805AD5; }
+        
+        /* Routing Views */
+        .view { display: none; min-height: calc(100vh - 100px); }
+        .view.active { display: block; }
+    </style>
+</head>
+<body data-theme="default" data-size="medium">
+    <div id="snow-container" class="snow-layer"></div>
+    
+    <!-- Page Transition Overlay -->
+    <div id="page-transition-overlay">
+      <div class="transition-circle"></div>
+    </div>
+    <!-- Accessibility Controls -->
+    <div class="accessibility-bar" role="toolbar" aria-label="Арнайы мүмкіндіктер">
+        <button id="toggle-tts" class="a11y-btn" title="Дыбыстық сүйемелдеуді қосу" aria-label="Дыбыстық сүйемелдеуді қосу">
+            <i data-lucide="volume-2"></i>
+        </button>
+        <button id="toggle-contrast" class="a11y-btn" title="Жоғары контраст режимі" aria-label="Жоғары контраст режимі">
+            <i data-lucide="contrast"></i>
+        </button>
+        <button id="increase-font" class="a11y-btn" title="Мәтінді үлкейту" aria-label="Мәтінді үлкейту">
+          <i data-lucide="type"></i>
+          <span class="size-level">A</span>
+        </button>
+    </div>
+
+    <header class="container flex justify-between items-center" style="padding: 1.5rem 2rem;">
+        <div class="flex items-center gap-4">
+            <button id="global-back" class="a11y-btn" style="display: none;" onclick="goBack()" title="Кері қайту" aria-label="Кері қайту">
+                <i data-lucide="arrow-left"></i>
+            </button>
+            <div class="logo flex items-center gap-4 cursor-pointer" onclick="navigate('home')">
+                <div style="background: var(--primary-gradient); width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                    <i data-lucide="atom" style="color: white;"></i>
+                </div>
+                <h1 style="font-size: 1.8rem; font-weight: 700; margin: 0;">Physics<span class="gradient-text">Access</span></h1>
+            </div>
+        </div>
+        <nav class="flex gap-6 items-center">
+            <div id="header-actions" class="flex gap-4">
+                <a href="#" onclick="navigate('login')" class="btn-secondary voice-target" style="padding: 0.6rem 1.2rem;">Кіру</a>
+                <a href="#" onclick="navigate('login')" class="btn-primary voice-target" style="padding: 0.6rem 1.2rem;">Тіркелу</a>
+            </div>
+        </nav>
+    </header>
+
+    <main id="main-content">
+        
+        <!-- Home View -->
+        <section id="home-view" class="view active container">
+            <div class="grid" style="grid-template-columns: 1fr 1fr; align-items: center; min-height: 70vh; gap: 4rem;">
+                <div class="animate-fade-in">
+                    <h2 style="font-size: 3.5rem; line-height: 1.1; margin-bottom: 1.5rem;" class="voice-target">
+                        Баршаға арналған <br><span class="gradient-text">Физикалық білім</span>
+                    </h2>
+                    <p style="font-size: 1.2rem; color: var(--text-secondary); margin-bottom: 2.5rem; max-width: 500px;" class="voice-target">
+                        Көру қабілеті бұзылған жандарға арналған инклюзивті платформа. Физика әлемін шектеусіз зерттеңіз.
+                    </p>
+                    <div class="flex gap-4">
+                        <button class="btn-primary btn-lg voice-target" onclick="navigate('login')">Бастау</button>
+                    </div>
+                </div>
+                <div class="flex items-center justify-center">
+                    <div class="hero-animation">
+                        <div class="atom">
+                            <div class="nucleus"></div>
+                            <div class="orbit orbit-1"><div class="electron"></div></div>
+                            <div class="orbit orbit-2"><div class="electron"></div></div>
+                            <div class="orbit orbit-3"><div class="electron"></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- === NEWS SECTION === -->
+            <div class="news-section">
+                <div class="news-section-header">
+                    <div class="news-badge">
+                        <i data-lucide="rss" style="width:14px;height:14px;"></i>
+                        Соңғы жаңалықтар
+                    </div>
+                    <h2 class="news-title voice-target">Инклюзивті білім беру бойынша<br><span>жаңалықтар мен зерттеулер</span></h2>
+                    <p class="news-subtitle voice-target">Қазақстандағы инклюзивті білім беру саласындағы ең соңғы жаңалықтар мен жетістіктер</p>
+                </div>
+
+                <div class="news-ticker-wrapper">
+                    <div class="ticker-fade ticker-fade-left"></div>
+                    <div class="ticker-fade ticker-fade-right"></div>
+                    <div class="news-ticker" id="news-ticker">
+                        <div class="news-ticker-track">
+                            <!-- Original Set (10 Items) -->
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #3182CE22, #3182CE44); border-color: #3182CE33;">
+                                    <i data-lucide="globe" style="color:#3182CE;"></i>
+                                </div>
+                                <span class="news-card-tag">ЮНЕСКО</span>
+                                <h4>ЮНЕСКО инклюзивті білімді барлық оқушыларға міндетті деп жариялады</h4>
+                                <p>2026 жылдың басынан бастап жаңа ғаламдық нұсқаулықтар 195 елдегі мүмкіндігі шектеулі оқушыларға арналған ресурстарды кеңейтеді.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 2 наурыз, 2026</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #E53E3E22, #E53E3E44); border-color: #E53E3E33;">
+                                    <i data-lucide="brain" style="color:#E53E3E;"></i>
+                                </div>
+                                <span class="news-card-tag">Зерттеу</span>
+                                <h4>Жаңа зерттеу: Дыбыстық оқыту мүмкіндігі шектеулі оқушылардың үлгерімін 40%-ға арттырды</h4>
+                                <p>Стэнфорд университетінің зерттеушілері 3 жыл бойы жүргізген эксперимент нәтижесінде маңызды жаңалық ашты.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 15 ақпан, 2026</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #805AD522, #805AD544); border-color: #805AD533;">
+                                    <i data-lucide="monitor-smartphone" style="color:#805AD5;"></i>
+                                </div>
+                                <span class="news-card-tag">Технология</span>
+                                <h4>ЖИ технологиялары мүмкіндігі шектеулі балаларға арналған оқыту жүйелерін революциялап жатыр</h4>
+                                <p>GPT негізіндегі жаңа платформалар нашар көретін оқушыларға бейінді түрде материал жеткізеді.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 28 қаңтар, 2026</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #38A16922, #38A16944); border-color: #38A16933;">
+                                    <i data-lucide="award" style="color:#38A169;"></i>
+                                </div>
+                                <span class="news-card-tag">Қазақстан</span>
+                                <h4>Қазақстан инклюзивті білімді кеңейту үшін ₸5 млрд бөлді</h4>
+                                <p>Оқу орындарын цифрландыру бюджетінің 30%-ы ерекше қажеттілігі бар оқушыларды қолдауға бағытталады.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 10 қаңтар, 2026</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #D6990022, #D6990044); border-color: #D6990033;">
+                                    <i data-lucide="book-marked" style="color:#D69900;"></i>
+                                </div>
+                                <span class="news-card-tag">Стандарт</span>
+                                <h4>Жаңа W3C WAI стандарты сайт пен қосымшаларды барлығына қолжетімді ету талабын күшейтеді</h4>
+                                <p>WCAG 3.0 нұсқасы мүмкіндігі шектеулі пайдаланушыларға арналған сандық мазмұнды жақсарту критерийлерін белгілейді.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 5 желтоқсан, 2025</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #3182CE22, #3182CE44); border-color: #3182CE33;">
+                                    <i data-lucide="users" style="color:#3182CE;"></i>
+                                </div>
+                                <span class="news-card-tag">Статистика</span>
+                                <h4>Дүниежүзінде 240 млн бала мүгедектікпен өмір сүреді — UNICEF есебі</h4>
+                                <p>Бұл балалардың 30%-ы ғана сапалы білімге қол жеткізе алады деп хабарлайды ұйым. Жаңа іс-шаралар жоспары жасалды.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 20 қараша, 2025</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #E53E3E22, #E53E3E44); border-color: #E53E3E33;">
+                                    <i data-lucide="graduation-cap" style="color:#E53E3E;"></i>
+                                </div>
+                                <span class="news-card-tag">Мектептер</span>
+                                <h4>Алматыда жаңа 5 инклюзивті мектеп ашылады</h4>
+                                <p>Келесі оқу жылында ерекше білім беруді қажет ететін балаларға арналған заманауи мектептер өз есігін айқара ашпақ.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 14 қазан, 2025</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #38A16922, #38A16944); border-color: #38A16933;">
+                                    <i data-lucide="lightbulb" style="color:#38A169;"></i>
+                                </div>
+                                <span class="news-card-tag">Гранттар</span>
+                                <h4>Инклюзивті стартаптарға арналған жаңа гранттар жарияланды</h4>
+                                <p>ҚР Ғылым және жоғары білім министрлігі білім беруді қолжетімді ететін АТ-шешімдерді жасаушыларға қаржылай қолдау көрсетеді.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 25 қыркүйек, 2025</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #805AD522, #805AD544); border-color: #805AD533;">
+                                    <i data-lucide="users-2" style="color:#805AD5;"></i>
+                                </div>
+                                <span class="news-card-tag">Мамандар</span>
+                                <h4>Елімізде 2000-нан астам мұғалім инклюзивті білім беру курстарынан өтті</h4>
+                                <p>Оқулық бағдарламалары жаңартылып, ұстаздар арнайы педагогикалық дағдыларын жетілдірді.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 12 тамыз, 2025</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #D6990022, #D6990044); border-color: #D6990033;">
+                                    <i data-lucide="headphones" style="color:#D69900;"></i>
+                                </div>
+                                <span class="news-card-tag">Жабдықтар</span>
+                                <h4>Мектептер жаңа тактильдi және дыбыстық құрылғылармен жабдықталды</h4>
+                                <p>Еліміздің барлық өңірлеріндегі орта мектептер көзі нашар көретін балалар үшін бейімделген құрылғылар алды.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 5 шілде, 2025</span>
+                            </div>
+
+                            <!-- Duplicate Set (10 Items) for infinite scroll -->
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #3182CE22, #3182CE44); border-color: #3182CE33;">
+                                    <i data-lucide="globe" style="color:#3182CE;"></i>
+                                </div>
+                                <span class="news-card-tag">ЮНЕСКО</span>
+                                <h4>ЮНЕСКО инклюзивті білімді барлық оқушыларға міндетті деп жариялады</h4>
+                                <p>2026 жылдың басынан бастап жаңа ғаламдық нұсқаулықтар 195 елдегі мүмкіндігі шектеулі оқушыларға арналған ресурстарды кеңейтеді.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 2 наурыз, 2026</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #E53E3E22, #E53E3E44); border-color: #E53E3E33;">
+                                    <i data-lucide="brain" style="color:#E53E3E;"></i>
+                                </div>
+                                <span class="news-card-tag">Зерттеу</span>
+                                <h4>Жаңа зерттеу: Дыбыстық оқыту мүмкіндігі шектеулі оқушылардың үлгерімін 40%-ға арттырды</h4>
+                                <p>Стэнфорд университетінің зерттеушілері 3 жыл бойы жүргізген эксперимент нәтижесінде маңызды жаңалық ашты.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 15 ақпан, 2026</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #805AD522, #805AD544); border-color: #805AD533;">
+                                    <i data-lucide="monitor-smartphone" style="color:#805AD5;"></i>
+                                </div>
+                                <span class="news-card-tag">Технология</span>
+                                <h4>ЖИ технологиялары мүмкіндігі шектеулі балаларға арналған оқыту жүйелерін революциялап жатыр</h4>
+                                <p>GPT негізіндегі жаңа платформалар нашар көретін оқушыларға бейінді түрде материал жеткізеді.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 28 қаңтар, 2026</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #38A16922, #38A16944); border-color: #38A16933;">
+                                    <i data-lucide="award" style="color:#38A169;"></i>
+                                </div>
+                                <span class="news-card-tag">Қазақстан</span>
+                                <h4>Қазақстан инклюзивті білімді кеңейту үшін ₸5 млрд бөлді</h4>
+                                <p>Оқу орындарын цифрландыру бюджетінің 30%-ы ерекше қажеттілігі бар оқушыларды қолдауға бағытталады.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 10 қаңтар, 2026</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #D6990022, #D6990044); border-color: #D6990033;">
+                                    <i data-lucide="book-marked" style="color:#D69900;"></i>
+                                </div>
+                                <span class="news-card-tag">Стандарт</span>
+                                <h4>Жаңа W3C WAI стандарты сайт пен қосымшаларды барлығына қолжетімді ету талабын күшейтеді</h4>
+                                <p>WCAG 3.0 нұсқасы мүмкіндігі шектеулі пайдаланушыларға арналған сандық мазмұнды жақсарту критерийлерін белгілейді.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 5 желтоқсан, 2025</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #3182CE22, #3182CE44); border-color: #3182CE33;">
+                                    <i data-lucide="users" style="color:#3182CE;"></i>
+                                </div>
+                                <span class="news-card-tag">Статистика</span>
+                                <h4>Дүниежүзінде 240 млн бала мүгедектікпен өмір сүреді — UNICEF есебі</h4>
+                                <p>Бұл балалардың 30%-ы ғана сапалы білімге қол жеткізе алады деп хабарлайды ұйым. Жаңа іс-шаралар жоспары жасалды.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 20 қараша, 2025</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #E53E3E22, #E53E3E44); border-color: #E53E3E33;">
+                                    <i data-lucide="graduation-cap" style="color:#E53E3E;"></i>
+                                </div>
+                                <span class="news-card-tag">Мектептер</span>
+                                <h4>Алматыда жаңа 5 инклюзивті мектеп ашылады</h4>
+                                <p>Келесі оқу жылында ерекше білім беруді қажет ететін балаларға арналған заманауи мектептер өз есігін айқара ашпақ.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 14 қазан, 2025</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #38A16922, #38A16944); border-color: #38A16933;">
+                                    <i data-lucide="lightbulb" style="color:#38A169;"></i>
+                                </div>
+                                <span class="news-card-tag">Гранттар</span>
+                                <h4>Инклюзивті стартаптарға арналған жаңа гранттар жарияланды</h4>
+                                <p>ҚР Ғылым және жоғары білім министрлігі білім беруді қолжетімді ететін АТ-шешімдерді жасаушыларға қаржылай қолдау көрсетеді.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 25 қыркүйек, 2025</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #805AD522, #805AD544); border-color: #805AD533;">
+                                    <i data-lucide="users-2" style="color:#805AD5;"></i>
+                                </div>
+                                <span class="news-card-tag">Мамандар</span>
+                                <h4>Елімізде 2000-нан астам мұғалім инклюзивті білім беру курстарынан өтті</h4>
+                                <p>Оқулық бағдарламалары жаңартылып, ұстаздар арнайы педагогикалық дағдыларын жетілдірді.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 12 тамыз, 2025</span>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon" style="background: linear-gradient(135deg, #D6990022, #D6990044); border-color: #D6990033;">
+                                    <i data-lucide="headphones" style="color:#D69900;"></i>
+                                </div>
+                                <span class="news-card-tag">Жабдықтар</span>
+                                <h4>Мектептер жаңа тактильдi және дыбыстық құрылғылармен жабдықталды</h4>
+                                <p>Еліміздің барлық өңірлеріндегі орта мектептер көзі нашар көретін балалар үшін бейімделген құрылғылар алды.</p>
+                                <span class="news-date"><i data-lucide="calendar" style="width:12px;height:12px;"></i> 5 шілде, 2025</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- === END NEWS SECTION === -->
+
+        </section>
+
+        <!-- Login View -->
+        <section id="login-view" class="view container">
+            <div class="flex flex-col items-center justify-center" style="min-height: 60vh;">
+                <h2 style="font-size: 2.5rem; margin-bottom: 2rem;" class="voice-target">Платформаға кіру</h2>
+                <div class="grid gap-8" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); width: 100%; max-width: 800px;">
+                    <div class="glass-card flex flex-col items-center gap-4 voice-target" onclick="login('teacher')">
+                        <i data-lucide="graduation-cap" size="48" style="color: var(--accent-purple);"></i>
+                        <h3 style="font-size: 1.5rem;">Мен Мұғаліммін</h3>
+                        <p style="text-align: center; color: var(--text-secondary);">Сабақ жоспарларын жасау және оқушылардың үлгерімін бақылау.</p>
+                        <button class="btn-primary" style="width: 100%;">Кіру</button>
+                    </div>
+                    <div class="glass-card flex flex-col items-center gap-4 voice-target" onclick="login('student')">
+                        <i data-lucide="user" size="48" style="color: var(--accent-orange);"></i>
+                        <h3 style="font-size: 1.5rem;">Мен Оқушымын</h3>
+                        <p style="text-align: center; color: var(--text-secondary);">Интерактивті сабақтар мен ойындар арқылы физиканы үйрену.</p>
+                        <button class="btn-primary" style="width: 100%;">Кіру</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dynamic Views (Teacher/Student/Labs) will be injected here or toggled -->
+        <section id="teacher-view" class="view container">
+            <!-- Content in next steps -->
+        </section>
+
+        <section id="student-view" class="view container">
+            <!-- Content in next steps -->
+        </section>
+
+        <section id="labs-view" class="view container">
+            <!-- Content in next steps -->
+        </section>
+
+    </main>
+
+    <footer class="container" style="padding: 4rem 2rem; border-top: 1px solid var(--border-glass); margin-top: 4rem;">
+        <div class="flex justify-between items-center">
+            <p style="color: var(--text-secondary);">&copy; 2026 PhysicsAccess. Барлық құқықтар қорғалған.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/app.js?v=2.2"></script>
+    <script src="js/accessibility.js"></script>
+    <script src="js/teacher.js"></script>
+    <script src="js/student.js"></script>
+    <script src="js/labs.js"></script>
+    <script>
+        // Init Lucide Icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>
