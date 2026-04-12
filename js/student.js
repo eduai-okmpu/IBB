@@ -156,12 +156,12 @@ function showStudentAIAssistant() {
           <!-- Messages -->
         </div>
 
-        <div style="padding: 1.5rem; border-top: 1px solid var(--border-glass); background: #fff;">
-          <div class="flex" style="gap: 1rem;">
+        <div class="chat-input-wrapper" style="padding: 1.2rem; border-top: 1px solid var(--border-glass); background: #fff;">
+          <div class="flex" style="gap: 0.75rem; align-items: center;">
             <input type="text" id="student-chat-input" placeholder="Физикадан көмек керек пе? Сұрақ қой..." 
-                   class="glass-panel" style="flex: 1; padding: 1rem 1.5rem; border-radius: 15px; border: 1px solid var(--border-glass); outline: none;"
+                   class="glass-panel" style="flex: 1; padding: 0.8rem 1.2rem; border-radius: 15px; border: 1px solid var(--border-glass); outline: none; font-size: 1rem;"
                    onkeypress="if(event.key === 'Enter') sendStudentAIMessage()">
-            <button class="btn-primary" onclick="sendStudentAIMessage()" style="width: 50px; height: 50px; padding: 0; border-radius: 15px; display: flex; align-items: center; justify-content: center;">
+            <button class="btn-primary chat-send-btn" onclick="sendStudentAIMessage()" style="width: 48px; height: 48px; flex-shrink: 0; padding: 0; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
               <i data-lucide="send" size="20"></i>
             </button>
           </div>

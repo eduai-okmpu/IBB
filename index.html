@@ -159,7 +159,10 @@
         <div class="transition-circle"></div>
     </div>
     <!-- Accessibility Controls -->
-    <div class="accessibility-bar" role="toolbar" aria-label="Арнайы мүмкіндіктер">
+    <div id="a11y-bar" class="accessibility-bar" role="toolbar" aria-label="Арнайы мүмкіндіктер">
+        <button id="toggle-a11y-menu" class="a11y-btn main-toggle" title="Арнайы мүмкіндіктерді ашу/жабу" aria-label="Арнайы мүмкіндіктерді ашу/жабу">
+            <i data-lucide="settings"></i>
+        </button>
         <button id="toggle-tts" class="a11y-btn" title="Дыбыстық сүйемелдеуді қосу"
             aria-label="Дыбыстық сүйемелдеуді қосу">
             <i data-lucide="volume-2"></i>
@@ -457,6 +460,10 @@
             <!-- Content in next steps -->
         </section>
 
+        <section id="teacher-ai-view" class="view container">
+            <!-- Content in next steps -->
+        </section>
+
         <section id="student-view" class="view container">
             <!-- Content in next steps -->
         </section>
@@ -511,7 +518,7 @@
     </button>
 
     <!-- Scripts -->
-    <script src="js/app.js?v=2.2"></script>
+    <script src="js/app.js?v=2.3"></script>
     <script src="js/accessibility.js"></script>
     <script src="js/teacher.js"></script>
     <script src="js/student.js"></script>

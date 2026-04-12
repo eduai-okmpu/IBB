@@ -6,6 +6,7 @@ const a11yState = {
   isTtsEnabled: localStorage.getItem('tts') === 'true',
   contrast: localStorage.getItem('contrast') || 'default',
   size: localStorage.getItem('size') || 'medium',
+  isMenuCollapsed: localStorage.getItem('a11y-menu-collapsed') === 'true' || window.innerWidth <= 768,
   synth: window.speechSynthesis,
   kazakhVoice: null
 };
@@ -109,6 +110,19 @@ function updateFontSizeUI() {
   }
 }
 
+// Toggle Accessibility Menu
+document.getElementById('toggle-a11y-menu').addEventListener('click', () => {
+  const bar = document.getElementById('a11y-bar');
+  a11yState.isMenuCollapsed = !a11yState.isMenuCollapsed;
+  localStorage.setItem('a11y-menu-collapsed', a11yState.isMenuCollapsed);
+  
+  if (a11yState.isMenuCollapsed) {
+    bar.classList.add('collapsed');
+  } else {
+    bar.classList.remove('collapsed');
+  }
+});
+
 // Hover event listeners for TTS
 document.addEventListener('mouseover', (e) => {
   if (!a11yState.isTtsEnabled) return;
@@ -157,6 +171,12 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Font Size Restore
   updateFontSizeUI();
+
+  // Menu State Restore
+  const bar = document.getElementById('a11y-bar');
+  if (a11yState.isMenuCollapsed) {
+    bar.classList.add('collapsed');
+  }
   
   lucide.createIcons();
 });

@@ -37,22 +37,8 @@ const defaultState = {
     achievements: [],
     avatar: null
   },
-  quizResults: [
-    { studentName: 'Нұрасыл Ерлан', grade: '10 "А"', topic: 'Механика', score: 9, maxScore: 10, date: '06.04.2026' },
-    { studentName: 'Аружан Бақыт', grade: '11 "Б"', topic: 'Термодинамика', score: 8, maxScore: 10, date: '05.04.2026' }
-  ],
-  allStudents: [
-    { id: 1, name: 'Айбек Жолдас', grade: '10 "А"', points: 1560, level: 16, school: '№15 ІТ мектеп-лицейі' },
-    { id: 2, name: 'Бауыржан Иса', grade: '10 "А"', points: 1420, level: 14, school: '№15 ІТ мектеп-лицейі' },
-    { id: 3, name: 'Гүлнұр Сәкен', grade: '11 "Б"', points: 1890, level: 19, school: '№15 ІТ мектеп-лицейі' },
-    { id: 4, name: 'Дәурен Мұрат', grade: '10 "А"', points: 980, level: 10, school: '№15 ІТ мектеп-лицейі' },
-    { id: 5, name: 'Еркебулан Қанат', grade: '11 "Б"', points: 2100, level: 21, school: '№15 ІТ мектеп-лицейі' },
-    { id: 6, name: 'Жанерке Серік', grade: '10 "А"', points: 1330, level: 13, school: '№15 ІТ мектеп-лицейі' },
-    { id: 7, name: 'Зейін Асқар', grade: '11 "Б"', points: 1750, level: 17, school: '№15 ІТ мектеп-лицейі' },
-    { id: 8, name: 'Қанат Серіков', grade: '10 "А"', points: 1250, level: 15, school: '№15 ІТ мектеп-лицейі' }, // matches current studentProfile
-    { id: 9, name: 'Ләззат Омар', grade: '10 "А"', points: 1100, level: 11, school: '№15 ІТ мектеп-лицейі' },
-    { id: 10, name: 'Мейіржан Болат', grade: '11 "Б"', points: 2450, level: 24, school: '№15 ІТ мектеп-лицейі' }
-  ],
+  quizResults: [],
+  allStudents: [],
   chatMessages: [],
   aiHistory: { teacher: [], student: [] },
   currentTeacherChatStudentId: null
@@ -61,12 +47,6 @@ const defaultState = {
 const savedState = localStorage.getItem('physicsAccessState');
 const parsedState = savedState ? JSON.parse(savedState) : {};
 const state = { ...defaultState, ...parsedState };
-if (!state.teacherProfile) state.teacherProfile = { ...defaultState.teacherProfile };
-if (!state.teacherProfile.documents) state.teacherProfile.documents = [];
-if (!state.quizResults) state.quizResults = [...defaultState.quizResults];
-if (!state.allStudents) state.allStudents = [...defaultState.allStudents];
-if (!state.chatMessages) state.chatMessages = [...defaultState.chatMessages];
-if (!state.aiHistory) state.aiHistory = { teacher: [], student: [] };
 
 function saveState() {
   localStorage.setItem('physicsAccessState', JSON.stringify({
@@ -92,13 +72,9 @@ window.addEventListener('storage', (e) => {
       state.aiHistory = newState.aiHistory;
       state.currentTeacherChatStudentId = newState.currentTeacherChatStudentId;
 
-
-
       // Refresh current view if it's a chat
       const chatContainer = document.getElementById('chat-messages-container');
       if (chatContainer) {
-
-
       }
     }
   }
@@ -122,7 +98,7 @@ function navigate(viewId, pushToHistory = true) {
   const headerActions = document.getElementById('header-actions');
   const authActions = document.getElementById('auth-actions');
 
-  if (state.user && (viewId === 'teacher' || viewId === 'student' || viewId === 'teacher-class')) {
+  if (state.user && (viewId === 'teacher' || viewId === 'student' || viewId === 'teacher-class' || viewId === 'teacher-ai')) {
     if (headerActions) headerActions.style.display = 'none';
     if (authActions) authActions.style.display = 'block';
 
@@ -134,9 +110,10 @@ function navigate(viewId, pushToHistory = true) {
   if (targetView) {
     targetView.classList.add('active');
     if (viewId === 'labs') renderLabs();
-    if (viewId === 'teacher' && state.user === 'teacher') renderTeacherDashboard();
+    if (viewId === 'teacher' && state.user === 'teacher') window.renderTeacherDashboard();
     if (viewId === 'student' && state.user === 'student') renderStudentDashboard();
     if (viewId === 'teacher-class' && state.user === 'teacher') window.showClassManager();
+    if (viewId === 'teacher-ai' && state.user === 'teacher') window.showAIAssistant();
   }
 
   // Handle calculator visibility
@@ -181,289 +158,153 @@ function logout() {
   navigate('home', false);
 }
 
-function renderLabs() {
+function renderLabs(category = null) {
+  const labsView = document.getElementById('labs-view');
+  if (!labsView) return;
+
+  if (!category) {
+    labsView.innerHTML = `
+      <div class="animate-fade-in" style="padding: 1rem;">
+        <h2 style="font-size: 2.2rem; font-weight: 800; margin-bottom: 2.5rem; color: var(--text-primary);" class="voice-target">Зертханалық жұмыстар</h2>
+        
+        <div class="grid gap-8" style="grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));">
+          <!-- PhysicsAccess Category -->
+          <div class="glass-card voice-target animate-hover" onclick="renderPhysicsAccessLabs()" style="padding: 2.5rem; cursor: pointer; border: 2px solid var(--accent-orange); position: relative; overflow: hidden; background: linear-gradient(135deg, rgba(242, 109, 33, 0.05), white);">
+            <div style="position: absolute; top: -30px; right: -30px; width: 120px; height: 120px; background: var(--accent-orange); opacity: 0.1; border-radius: 50%;"></div>
+            <div style="background: var(--primary-gradient); width: 64px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin-bottom: 2rem; color: white;">
+              <i data-lucide="blocks" size="32"></i>
+            </div>
+            <h3 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 1rem; color: var(--text-primary);">PhysicsAccess платформасы</h3>
+            <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.5rem;">Интерактивті, қолмен есептелетін және сандық зертханалық жұмыстар жинағы.</p>
+            <div class="flex items-center gap-2" style="font-weight: 700; color: var(--accent-orange);">
+              КӨРУ <i data-lucide="chevron-right" size="20"></i>
+            </div>
+          </div>
+
+          <!-- Phet Category -->
+          <div class="glass-card voice-target animate-hover" onclick="renderPhetLabsList()" style="padding: 2.5rem; cursor: pointer; border: 2px solid #3b82f6; position: relative; overflow: hidden; background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), white);">
+            <div style="position: absolute; top: -30px; right: -30px; width: 120px; height: 120px; background: #3b82f6; opacity: 0.1; border-radius: 50%;"></div>
+            <div style="background: linear-gradient(135deg, #3b82f6, #2563eb); width: 64px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center; margin-bottom: 2rem; color: white;">
+              <i data-lucide="shapes" size="32"></i>
+            </div>
+            <h3 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 1rem; color: var(--text-primary);">Phet симуляциялары</h3>
+            <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.5rem;">Әлемдік деңгейдегі интерактивті көрнекі физикалық симуляциялар тізімі.</p>
+            <div class="flex items-center gap-2" style="font-weight: 700; color: #3b82f6;">
+              КӨРУ <i data-lucide="chevron-right" size="20"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  lucide.createIcons();
+}
+
+function renderPhysicsAccessLabs() {
   const labsView = document.getElementById('labs-view');
   labsView.innerHTML = `
-    <h2 style="font-size: 2.5rem; margin-bottom: 2rem;" class="voice-target">Зертханалық жұмыс тізімі</h2>
-    <div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
-       ${state.labs.map(lab => `
-         <div class="glass-card voice-target" onclick="showLabDetails(${lab.id})">
-           <div style="background: var(--primary-gradient); width: 32px; height: 32px; border-radius: 4px; display: flex; align-items: center; justify-content: center; margin-bottom: 1rem;">
-             <span style="color: white; font-weight: bold;">${lab.id}</span>
-           </div>
-           <h3 style="margin-bottom: 0.5rem;">${lab.title}</h3>
-           <p style="color: var(--text-secondary); font-size: 0.9rem;">${lab.desc}</p>
-         </div>
-       `).join('')}
+    <div class="animate-fade-in" style="padding: 1rem;">
+      <button class="btn-secondary v-center" style="margin-bottom: 2rem; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="renderLabs()">
+        <i data-lucide="arrow-left" size="18"></i> Артқа
+      </button>
+
+      <div class="flex items-center gap-4" style="margin-bottom: 2.5rem;">
+        <div style="background: var(--accent-orange); padding: 10px; border-radius: 12px; color: white;">
+          <i data-lucide="blocks" size="28"></i>
+        </div>
+        <h2 style="font-size: 2rem; font-weight: 800; margin: 0;">PhysicsAccess Зертханалары</h2>
+      </div>
+      
+      <div class="grid gap-6" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
+        <!-- Lab 1 -->
+        <div class="glass-card voice-target animate-hover" onclick="showPhysicsAccessLab('freefall')" style="padding: 2rem; border-left: 8px solid var(--accent-orange);">
+           <h4 class="label-caps" style="color: var(--accent-orange); font-size: 0.75rem; margin-bottom: 0.5rem;">№1 Зертханалық жұмыс</h4>
+           <h3 style="font-size: 1.4rem; font-weight: 800; margin-bottom: 1rem;">Еркін түсуді зерттеу</h3>
+           <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.5;">Дененің еркін түсу уақыты мен жылдамдығының биіктікке тәуелділігін зерделеу.</p>
+        </div>
+
+        <!-- Lab 2 -->
+        <div class="glass-card voice-target animate-hover" onclick="showPhysicsAccessLab('impulse')" style="padding: 2rem; border-left: 8px solid #6366f1;">
+           <h4 class="label-caps" style="color: #6366f1; font-size: 0.75rem; margin-bottom: 0.5rem;">№2 Зертханалық жұмыс</h4>
+           <h3 style="font-size: 1.4rem; font-weight: 800; margin-bottom: 1rem;">Денелердің соқтығысуы</h3>
+           <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.5;">Серпімді және серпімсіз соқтығыстар кезінде импульстің сақталуын зерттеу.</p>
+        </div>
+
+        <!-- Lab 3 -->
+        <div class="glass-card voice-target animate-hover" onclick="showPhysicsAccessLab('hooke')" style="padding: 2rem; border-left: 8px solid #22c55e;">
+           <h4 class="label-caps" style="color: #22c55e; font-size: 0.75rem; margin-bottom: 0.5rem;">№3 Зертханалық жұмыс</h4>
+           <h3 style="font-size: 1.4rem; font-weight: 800; margin-bottom: 1rem;">Гук заңын зерттеу</h3>
+           <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.5;">Серпімділік күшінің ұзаруға тәуелділігін зерделеу және қатаңдықты анықтау.</p>
+        </div>
+      </div>
     </div>
   `;
   lucide.createIcons();
 }
 
-function renderTeacherDashboard() {
-  const teacherView = document.getElementById('teacher-view');
-  teacherView.innerHTML = `
-    <div class="dashboard-container">
-      <aside class="sidebar-panel glass-panel animate-slide-in">
-        
-        <!-- Profile Section -->
-        <div class="flex flex-col items-center gap-4 text-center">
-          <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; border: 3px solid var(--border-glass); overflow: hidden;">
-            ${state.teacherProfile.avatar ? `<img src="${state.teacherProfile.avatar}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i data-lucide="user" size="48" style="color: var(--text-primary);"></i>`}
-          </div>
-          <div style="text-align: center; width: 100%;">
-            <h3 style="font-size: var(--font-xl); font-weight: 700; margin-bottom: 0.2rem; text-align: center;">${state.teacherProfile.name}</h3>
-            <p style="color: var(--text-secondary); font-size: var(--font-sm); text-align: center; display: block; margin: 0 auto;">${state.teacherProfile.category}</p>
-          </div>
-          <button class="btn-primary" style="padding: 0.4rem 1rem; font-size: 0.85rem; border-radius: 6px;" onclick="showTeacherProfile(true)"><i data-lucide="edit" size="16"></i> Ақпаратты өңдеу</button>
+function renderPhetLabsList() {
+  const labsView = document.getElementById('labs-view');
+  labsView.innerHTML = `
+    <div class="animate-fade-in" style="padding: 1rem;">
+      <button class="btn-secondary v-center" style="margin-bottom: 2rem; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="renderLabs()">
+        <i data-lucide="arrow-left" size="18"></i> Артқа
+      </button>
+
+      <div class="flex items-center gap-4" style="margin-bottom: 2.5rem;">
+        <div style="background: #3b82f6; padding: 10px; border-radius: 12px; color: white;">
+          <i data-lucide="shapes" size="28"></i>
         </div>
+        <h2 style="font-size: 2rem; font-weight: 800; margin: 0;">Phet интерактивті симуляциялары</h2>
+      </div>
 
-        <div class="flex flex-col gap-2" style="background: rgba(255,255,255,0.6); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-glass); box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
-          
-          <!-- School Info -->
-          <div class="v-center gap-4" style="padding: 0.5rem; background: var(--bg-glass-bright); border-radius: 8px;">
-            <div class="flex-center" style="width: 32px; height: 32px; background: rgba(242, 109, 33, 0.1); border-radius: 6px; color: var(--accent-orange); flex-shrink: 0;">
-              <i data-lucide="school" size="16"></i>
-            </div>
-            <div class="flex flex-col flex-1" style="overflow: hidden;">
-              <span class="label-caps">Мектебі</span>
-              <span style="font-weight: 600; font-size: var(--font-sm); line-height: 1.3;">${state.teacherProfile.school}</span>
-            </div>
-          </div>
-
-          <!-- Class Info -->
-          <div class="v-center gap-4" style="padding: 0.5rem; background: var(--bg-glass-bright); border-radius: 8px;">
-            <div class="flex-center" style="width: 32px; height: 32px; background: rgba(242, 109, 33, 0.1); border-radius: 6px; color: var(--accent-orange); flex-shrink: 0;">
-              <i data-lucide="users" size="16"></i>
-            </div>
-            <div class="flex flex-col flex-1" style="overflow: hidden;">
-              <span class="label-caps">Сыныбы</span>
-              <span style="font-weight: 600; font-size: var(--font-sm); line-height: 1.3;">${state.teacherProfile.classes}</span>
-            </div>
-          </div>
-
-          <!-- Subject Info -->
-          <div class="v-center gap-4" style="padding: 0.5rem; background: var(--bg-glass-bright); border-radius: 8px;">
-            <div class="flex-center" style="width: 32px; height: 32px; background: rgba(242, 109, 33, 0.1); border-radius: 6px; color: var(--accent-orange); flex-shrink: 0;">
-              <i data-lucide="book-open" size="16"></i>
-            </div>
-            <div class="flex flex-col flex-1" style="overflow: hidden;">
-              <span class="label-caps">Пәні</span>
-              <span style="font-weight: 600; font-size: var(--font-sm); line-height: 1.3;">${state.teacherProfile.subject}</span>
-            </div>
-          </div>
-
-          <!-- Achievements -->
-          <div class="v-center gap-4" style="padding: 0.5rem; background: var(--bg-glass-bright); border-radius: 8px;">
-            <div class="flex-center" style="width: 32px; height: 32px; background: rgba(242, 109, 33, 0.1); border-radius: 6px; color: var(--accent-orange); flex-shrink: 0;">
-              <i data-lucide="award" size="16"></i>
-            </div>
-            <div class="flex flex-col flex-1">
-              <span class="label-caps">Жетістіктері</span>
-              <span style="font-size: var(--font-xs); font-weight: 500; line-height: 1.4; margin-top: 0.15rem;">${state.teacherProfile.achievementsText.replace(/\n/g, '<br>')}</span>
-            </div>
-          </div>
-
-        </div>
-
-
-
-        <button class="btn-secondary v-center h-center" style="border-radius: 12px; border: 1px solid var(--border-glass); background: #fff; padding: 0.8rem; font-size: var(--font-sm); font-weight: 700; color: #1e293b; gap: 0.5rem; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.02);" onclick="showMyDocuments()">
-          <i data-lucide="folder" size="18" style="color: var(--accent-orange);"></i> Менің құжаттарым
-        </button>
-
-        <button class="btn-secondary v-center h-center" style="margin-top: auto; border-radius: 12px; border: 1px solid var(--border-glass); background: #fff; padding: 0.8rem; font-size: var(--font-sm); font-weight: 700; color: #1e293b; gap: 0.5rem; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.02);" onclick="logout()">
-          <i data-lucide="log-out" size="18"></i> Шығу
-        </button>
-      </aside>
-
-      <div id="teacher-content" class="content-panel glass-panel">
-        <h2 class="voice-target" style="font-size: var(--font-3xl); margin-bottom: 1rem;">Қош келдіңіз, ${state.teacherProfile.name || 'Ұстаз'}!</h2>
-        <p class="voice-target" style="color: var(--text-secondary); font-size: var(--font-base); margin-bottom: 2rem;">Бүгін қандай сабақ жоспарын дайындаймыз?</p>
-        
-        <div class="feature-grid animate-fade-in">
-          <!-- Card 1: AI Assistant -->
-          <div class="feature-card voice-target">
-            <div class="icon-circle" style="color: var(--accent-orange);">
-              <i data-lucide="bot" size="32"></i>
-            </div>
-            <h3 class="label-caps" style="color: var(--text-primary);">AI Көмекші</h3>
-            <p style="color: var(--text-secondary); font-size: var(--font-xs); line-height: 1.4;">Жасанды интеллект көмегімен сабақ жоспарларын жасаңыз.</p>
-            <button class="card-btn orange label-caps" onclick="showAIAssistant()">КІРУ</button>
-          </div>
-
-          <!-- Card 3: My Class -->
-          <div class="feature-card voice-target">
-            <div class="icon-circle" style="color: var(--accent-orange);">
-              <i data-lucide="users-2" size="32"></i>
-            </div>
-            <h3 class="label-caps" style="color: var(--text-primary);">Менің сыныбым</h3>
-            <p style="color: var(--text-secondary); font-size: var(--font-xs); line-height: 1.4;">Оқушылар тізімін әліпбилік ретпен көріп, мәліметтерді бақылаңыз.</p>
-            <button class="card-btn orange label-caps" onclick="navigate('teacher-class')">КІРУ</button>
-          </div>
-
-          <!-- Card 4: Assignments -->
-          <div class="feature-card voice-target">
-            <div class="icon-circle" style="color: var(--accent-orange);">
-              <i data-lucide="clipboard-list" size="32"></i>
-            </div>
-            <h3 class="label-caps" style="color: var(--text-primary);">Тапсырмалар</h3>
-            <p style="color: var(--text-secondary); font-size: var(--font-xs); line-height: 1.4;">Үй тапсырмалары мен тесттерді құрастырыңыз және тексеріңіз.</p>
-            <button class="card-btn orange label-caps" onclick="showAssignments()">КІРУ</button>
-          </div>
-
-          <!-- Card 5: Lab Works -->
-          <div class="feature-card voice-target">
-            <div class="icon-circle" style="color: var(--accent-orange);">
-              <i data-lucide="flask-conical" size="32"></i>
-            </div>
-            <h3 class="label-caps" style="color: var(--text-primary);">Зертханалық жұмыстар</h3>
-            <p style="color: var(--text-secondary); font-size: var(--font-xs); line-height: 1.4;">Интерактивті симуляциялар мен тәжірибелерді жасаңыз.</p>
-            <button class="card-btn orange label-caps" onclick="navigate('labs')">КІРУ</button>
-          </div>
-
-          <!-- Card 6: Electronic Textbooks -->
-          <div class="feature-card voice-target">
-            <div class="icon-circle" style="color: var(--accent-orange);">
-              <i data-lucide="book-open" size="32"></i>
-            </div>
-            <h3 class="label-caps" style="color: var(--text-primary);">Оқулықтар</h3>
-            <p style="color: var(--text-secondary); font-size: var(--font-xs); line-height: 1.4;">Дайын физика оқулықтарына тікелей сілтемелер мен онлайн оқу мүмкіндігі.</p>
-            <button class="card-btn orange label-caps" onclick="showResourceLibrary('teacher-content', 'renderTeacherDashboard')">КІРУ</button>
-          </div>
-        </div>
+      <div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+         ${state.labs.map(lab => `
+           <div class="glass-card voice-target animate-hover" onclick="showLabDetails(${lab.id})" style="padding: 1.5rem; border: 1px solid var(--border-glass);">
+             <div style="background: #3b82f6; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; color: white; font-weight: 900; font-size: 0.8rem;">
+               ${lab.id}
+             </div>
+             <h3 style="margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">${lab.title}</h3>
+             <p style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5;">${lab.desc}</p>
+           </div>
+         `).join('')}
       </div>
     </div>
   `;
+  lucide.createIcons();
+}
+
+function showPhysicsAccessLab(type) {
+  const container = document.getElementById('labs-view');
+  if (!container) return;
+  
+  if (type === 'freefall') {
+    container.innerHTML = `
+      <button class="btn-secondary v-center" style="margin-bottom: 1.5rem; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="renderPhysicsAccessLabs()">
+        <i data-lucide="arrow-left" size="18"></i> Тізімге оралу
+      </button>
+      ${renderFreeFallLab(true)}
+    `;
+  } else if (type === 'impulse') {
+    container.innerHTML = `
+      <button class="btn-secondary v-center" style="margin-bottom: 1.5rem; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="renderPhysicsAccessLabs()">
+        <i data-lucide="arrow-left" size="18"></i> Тізімге оралу
+      </button>
+      ${renderImpulseLab()}
+    `;
+  } else if (type === 'hooke') {
+    container.innerHTML = `
+      <button class="btn-secondary v-center" style="margin-bottom: 1.5rem; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="renderPhysicsAccessLabs()">
+        <i data-lucide="arrow-left" size="18"></i> Тізімге оралу
+      </button>
+      ${renderCurrentLab()}
+    `;
+  }
   lucide.createIcons();
 }
 
 /**
- * Teacher Profile Edit Feature
+ * Teacher & Student logic moved to respective files
  */
-function showTeacherProfile(editMode = false) {
-  const content = document.getElementById('teacher-content');
-  if (!content) return;
-
-  if (editMode) {
-    const p = state.teacherProfile;
-
-    // Generate class options (7-11 grades, A, Ä, B sections)
-    const grades = [7, 8, 9, 10, 11];
-    const sections = ['А', 'Ә', 'Б'];
-    const currentClasses = p.classes ? p.classes.split(',').map(s => s.trim()) : [];
-
-    let classSelectionsHtml = '';
-    grades.forEach(g => {
-      sections.forEach(s => {
-        const val = `${g} "${s}"`;
-        const isChecked = currentClasses.includes(val) ? 'checked' : '';
-        classSelectionsHtml += `
-          <label class="flex items-center gap-3 pointer" style="padding: 0.7rem; border: 1px solid var(--border-glass); border-radius: 12px; background: ${isChecked ? 'rgba(255, 126, 85, 0.08)' : '#fff'}; cursor: pointer; transition: all 0.2s; border: 1.5px solid ${isChecked ? 'var(--accent-orange)' : 'var(--border-glass)'};">
-              <input type="checkbox" class="class-checkbox" value='${val}' ${isChecked} style="cursor: pointer; width: 20px; height: 20px; accent-color: var(--accent-orange);">
-              <span style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary);">${val}</span>
-          </label>
-        `;
-      });
-    });
-
-    // Generate subject options
-    const subjects = ['Физика', 'Математика', 'Информатика', 'Химия', 'Биология', 'География', 'Тарих', 'Қазақ тілі', 'Орыс тілі', 'Ағылшын тілі', 'Дене шынықтыру', 'Көркем еңбек'];
-    const subjectOptionsHtml = subjects.map(s => `<option value="${s}" ${p.subject === s ? 'selected' : ''}>${s}</option>`).join('');
-
-    content.innerHTML = `
-      <div class="glass-card animate-fade-in" style="padding: 2.5rem; max-width: 600px; margin: 0 auto; border: 1px solid var(--border-glass); border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.05);">
-          <h2 class="gradient-text" style="font-size: 1.8rem; margin-bottom: 2rem; font-weight: 800;">Профильді өңдеу</h2>
-          
-          <!-- Avatar Upload -->
-          <div class="flex flex-col items-center gap-2 mb-6">
-            <div id="avatar-preview-container" onclick="document.getElementById('edit-avatar').click()" style="width: 120px; height: 120px; border-radius: 50%; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; border: 4px solid var(--border-glass); cursor: pointer; overflow: hidden; position: relative;">
-              ${p.avatar ? `<img id="avatar-preview-img" src="${p.avatar}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i id="avatar-placeholder" data-lucide="user" size="48" style="color: var(--text-primary);"></i>`}
-              <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.4); padding: 4px; color: white; font-size: 10px; text-align: center; font-weight: 700;">ЖҮКТЕУ</div>
-            </div>
-            <input type="file" id="edit-avatar" style="display: none;" accept="image/*">
-            <span class="label-caps" style="font-size: 10px; color: var(--text-tertiary);">Суретті ауыстыру үшін басыңыз</span>
-          </div>
-
-          <div class="flex flex-col gap-4">
-              <div class="flex flex-col gap-2">
-                  <label class="label-caps">Толық аты-жөні:</label>
-                  <input type="text" id="edit-name" value="${p.name}" class="glass-panel" style="padding: 1rem; border-radius: 12px; border: 1px solid var(--border-glass); background: #fff; outline: none; font-size: var(--font-base);">
-              </div>
-              <div class="flex flex-col gap-2">
-                  <label class="label-caps">Санаты:</label>
-                  <input type="text" id="edit-category" value="${p.category}" class="glass-panel" style="padding: 1rem; border-radius: 12px; border: 1px solid var(--border-glass); background: #fff; outline: none; font-size: var(--font-base);">
-              </div>
-              <div class="flex flex-col gap-2">
-                  <label class="label-caps">Мектебі:</label>
-                  <input type="text" id="edit-school" value="${p.school}" class="glass-panel" style="padding: 1rem; border-radius: 12px; border: 1px solid var(--border-glass); background: #fff; outline: none; font-size: var(--font-base);">
-              </div>
-              <div class="flex flex-col gap-2">
-                  <label class="label-caps">Пәні:</label>
-                  <select id="edit-subject" class="glass-panel" style="padding: 1rem; border-radius: 12px; border: 1px solid var(--border-glass); background: #fff; outline: none; font-size: var(--font-base); cursor: pointer;">
-                      ${subjectOptionsHtml}
-                  </select>
-              </div>
-              <div class="flex flex-col gap-2">
-                  <label class="label-caps">Сыныптары:</label>
-                  <div id="classes-selection-grid" class="grid gap-2" style="grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); background: #fdfdfd; padding: 1.2rem; border-radius: 16px; border: 1px solid var(--border-glass); max-height: 220px; overflow-y: auto;">
-                      ${classSelectionsHtml}
-                  </div>
-                  <span class="label-caps" style="font-size: 10px; color: var(--text-tertiary); margin-top: 4px;">Бірнеше сыныпты таңдауға болады</span>
-              </div>
-              <div class="flex flex-col gap-2">
-                  <label class="label-caps">Жетістіктері:</label>
-                  <textarea id="edit-achievements" class="glass-panel" style="padding: 1rem; border-radius: 12px; border: 1px solid var(--border-glass); background: #fff; min-height: 120px; outline: none; font-size: var(--font-base); font-family: inherit;">${p.achievementsText}</textarea>
-              </div>
-              <div class="flex gap-4" style="margin-top: 1.5rem;">
-                  <button class="btn-primary" style="flex: 1; padding: 1.1rem; border-radius: 14px;" onclick="saveTeacherProfile()"><i data-lucide="save" size="18"></i> Сақтау</button>
-                  <button class="btn-secondary" style="flex: 1; padding: 1.1rem; border-radius: 14px;" onclick="renderTeacherDashboard()">Болдырмау</button>
-              </div>
-          </div>
-      </div>
-    `;
-
-    // File upload handler
-    document.getElementById('edit-avatar').onchange = (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          state.tempAvatar = e.target.result;
-          const container = document.getElementById('avatar-preview-container');
-          container.innerHTML = `
-            <img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
-            <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.4); padding: 4px; color: white; font-size: 10px; text-align: center; font-weight: 700;">ЖҮКТЕУ</div>
-          `;
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-
-    lucide.createIcons();
-  }
-}
-
-function saveTeacherProfile() {
-  state.teacherProfile.name = document.getElementById('edit-name').value;
-  state.teacherProfile.category = document.getElementById('edit-category').value;
-  state.teacherProfile.school = document.getElementById('edit-school').value;
-  state.teacherProfile.subject = document.getElementById('edit-subject').value;
-  state.teacherProfile.achievementsText = document.getElementById('edit-achievements').value;
-
-  // Collect checked classes
-  const checkedClasses = Array.from(document.querySelectorAll('.class-checkbox:checked')).map(el => el.value);
-  state.teacherProfile.classes = checkedClasses.join(', ');
-
-  if (state.tempAvatar) {
-    state.teacherProfile.avatar = state.tempAvatar;
-    delete state.tempAvatar;
-  }
-
-  saveState();
-  renderTeacherDashboard();
-  if (window.speakText) window.speakText('Профиль мәліметтері сәтті сақталды.');
-}
 
 function renderStudentDashboard() {
   const studentView = document.getElementById('student-view');
@@ -575,13 +416,63 @@ const lessonsData = {
     title: 'Дененің еркін түсу үдеуі',
     image: 'media/lessons/freefall.png',
     video: 'https://www.youtube.com/embed/5UaK3fOf-0I',
-    theory: '<h3>Еркін түсу ұғымы</h3><p><b>Еркін түсу</b> — бұл денелердің тек қана ауырлық күшінің әсерінен қозғалуы.</p>',
+    theory: `<h3>Еркін түсу ұғымы</h3>
+             <p><b>Еркін түсу</b> — бұл денелердің тек қана ауырлық күшінің әсерінен қозғалуы. Мұндай қозғалыс кезінде денеге басқа ешқандай күштер (мысалы, ауаның кедергі күші) әсер етпейді деп есептеледі.</p>
+             <h4>Негізгі сипаттамалары:</h4>
+             <ul>
+               <li>Барлық денелер массасына қарамастан бірдей үдеумен түседі.</li>
+               <li>Бұл үдеу <b>еркін түсу үдеуі</b> деп аталады және <b>g</b> әрпімен белгіленеді.</li>
+             </ul>
+             <div class="glass-card flex-center" style="padding: 1.5rem; margin: 1rem 0; font-size: 1.5rem; font-weight: 800; color: var(--accent-orange); flex-direction: column; gap: 10px;">
+               <div style="font-size: 0.9rem; color: var(--text-tertiary);" class="label-caps">Тұрақты мән:</div>
+               g ≈ 9.8 м/с²
+             </div>
+             <h4>Маңызды формулалар:</h4>
+             <div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin: 1.5rem 0;">
+               <div class="glass-card" style="padding: 1.5rem; text-align: center;">
+                 <div style="font-size: 0.8rem; color: var(--text-tertiary);" class="label-caps">Жылдамдық:</div>
+                 <div style="font-size: 1.4rem; font-weight: 800; margin-top: 0.5rem;">v = g · t</div>
+               </div>
+               <div class="glass-card" style="padding: 1.5rem; text-align: center;">
+                 <div style="font-size: 0.8rem; color: var(--text-tertiary);" class="label-caps">Биіктік:</div>
+                 <div style="font-size: 1.4rem; font-weight: 800; margin-top: 0.5rem;">h = (g · t²) / 2</div>
+               </div>
+               <div class="glass-card" style="padding: 1.5rem; text-align: center;">
+                 <div style="font-size: 0.8rem; color: var(--text-tertiary);" class="label-caps">Тәуелсіздік:</div>
+                 <div style="font-size: 1.4rem; font-weight: 800; margin-top: 0.5rem;">v² = 2gh</div>
+               </div>
+             </div>
+             <p>Мұндағы: <b>v</b> — соңғы жылдамдық (м/с), <b>t</b> — уақыт (с), <b>h</b> — биіктік (м).</p>`,
     quiz: [
       {
         question: 'Еркін түсу үдеуінің мәні қандай?',
         options: ['9.8 м/с²', '5.5 м/с²', '1.6 м/с²', '12 м/с²'],
         correct: '9.8 м/с²',
         explanation: 'Жер бетіндегі еркін түсу үдеуі шамамен 9.8 м/с²-қа тең.'
+      },
+      {
+        question: 'Вакуумде (ауасыз кеңістікте) ауыр және жеңіл денелердің түсу жылдамдығы қалай өзгереді?',
+        options: ['Бірдей түседі', 'Ауыр дене тезірек түседі', 'Жеңіл дене тезірек түседі', 'Салмағына байланысты'],
+        correct: 'Бірдей түседі',
+        explanation: 'Вакуумде ауа кедергісі болмағандықтан, барлық денелер массасына қарамастан бірдей үдеумен түседі.'
+      },
+      {
+        question: 'Еркін түсу кезіндегі жүрілген жолдың (биіктік) формуласы қандай?',
+        options: ['h = gt²/2', 'h = gt', 'h = v/t', 'h = mg'],
+        correct: 'h = gt²/2',
+        explanation: 'Еркін түсу — бұл бастапқы жылдамдығы нөлге тең теңайнымалы қозғалыс, сондықтан жол формуласы: h = gt²/2.'
+      },
+      {
+        question: 'Дене 2 секунд бойы еркін түссе, оның соңғы жылдамдығы қандай болады? (g=10 м/с²)',
+        options: ['20 м/с', '10 м/с', '5 м/с', '40 м/с'],
+        correct: '20 м/с',
+        explanation: 'v = g * t формуласы бойынша: 10 * 2 = 20 м/с.'
+      },
+      {
+        question: 'Еркін түсу үдеуін және денелердің бірдей түсетінін алғаш дәлелдеген ғалым?',
+        options: ['Галилео Галилей', 'Исаак Ньютон', 'Альберт Эйнштейн', 'Архимед'],
+        correct: 'Галилео Галилей',
+        explanation: 'Пиза мұнарасында тәжірибе жасай отырып, денелердің түсу уақыты массаға тәуелсіз екенін алғаш Галилей дәлелдеді.'
       }
     ]
   },
@@ -589,13 +480,54 @@ const lessonsData = {
     title: 'Дене импульсі',
     image: 'media/lessons/impulse.png',
     video: 'https://www.youtube.com/embed/f3pG1iH9Fh0',
-    theory: '<h3>Дене импульсі ұғымы</h3><p><b>Дене импульсі</b> — бұл масса мен жылдамдықтың көбейтіндісі.</p>',
+    theory: `<h3>Дене импульсі және оның сақталу заңы</h3>
+             <p><b>Дене импульсі (қозғалыс мөлшері)</b> — бұл дененің инерттілігі мен қозғалыс жылдамдығын сипаттайтын векторлық физикалық шама.</p>
+             <div class="glass-card flex-center" style="padding: 1.5rem; margin: 1rem 0; font-size: 1.8rem; font-weight: 800; color: var(--accent-purple); flex-direction: column; gap: 10px;">
+               <div style="font-size: 0.9rem; color: var(--text-tertiary);" class="label-caps">Импульс формуласы:</div>
+               p = m · v
+             </div>
+             <p>Мұндағы: <b>p</b> — импульс (кг·м/с), <b>m</b> — масса (кг), <b>v</b> — жылдамдық (м/с).</p>
+             <h4>Күш импульсі және импульстің өзгеруі:</h4>
+             <p>Ньютонның екінші заңына сәйкес, дене импульсінің өзгеруі әсер етуші күш пен уақыттың көбейтіндісіне тең:</p>
+             <div class="glass-card" style="padding: 1.5rem; text-align: center; margin: 1rem 0;">
+               <div style="font-size: 1.4rem; font-weight: 800;">F · Δt = Δp</div>
+               <p style="font-size: 0.9rem; color: var(--text-tertiary); margin-top: 0.5rem;">мұндағы Δp = m(v₂ - v₁)</p>
+             </div>
+             <h4>Импульстің сақталу заңы:</h4>
+             <p>Сыртқы күштер әсер етпеген тұйық жүйеде денелердің импульстерінің векторлық қосындысы тұрақты болып қалады:</p>
+             <div style="background: rgba(147, 51, 234, 0.05); padding: 1.2rem; border-radius: 12px; border: 1px dashed var(--accent-purple); font-weight: 700; text-align: center; margin-top: 1rem;">
+               p₁ + p₂ = p'₁ + p'₂
+             </div>`,
     quiz: [
       {
         question: 'Дене импульсінің формуласы қандай?',
         options: ['p = m · v', 'p = m / v', 'p = F · s', 'p = m · g'],
         correct: 'p = m · v',
-        explanation: 'p = m * v.'
+        explanation: 'Дене импульсі — бұл масса мен жылдамдықтың көбейтіндісі: p = m * v.'
+      },
+      {
+        question: 'Дене импульсінің Халықаралық бірліктер жүйесіндегі өлшем бірлігі?',
+        options: ['кг·м/с', 'кг/м', 'Н', 'Дж'],
+        correct: 'кг·м/с',
+        explanation: 'Масса (кг) мен жылдамдықтың (м/с) көбейтіндісі болғандықтан, импульс бірлігі кг·м/с болады.'
+      },
+      {
+        question: 'Күш импульсі (F·Δt) физикалық мағынасы жағынан неге тең?',
+        options: ['Импульстің өзгеруіне', 'Жолға', 'Күшке', 'Қуатқа'],
+        correct: 'Импульстің өзгеруіне',
+        explanation: 'F * Δt = Δp, яғни күш импульсі дене импульсінің өзгеруіне тең болады.'
+      },
+      {
+        question: 'Егер дененің жылдамдығы 2 есе артса, оның импульсі қалай өзгереді?',
+        options: ['2 есе артады', '2 есе кемиді', 'Өзгермейді', '4 есе артады'],
+        correct: '2 есе артады',
+        explanation: 'Импульс жылдамдыққа тура пропорционал (p = mv), сондықтан ол да 2 есе артады.'
+      },
+      {
+        question: 'Импульстің сақталу заңы орындалатын жүйе қалай аталады?',
+        options: ['Тұйық жүйе', 'Ашық жүйе', 'Еркін жүйе', 'Инерциялық жүйе'],
+        correct: 'Тұйық жүйе',
+        explanation: 'Сыртқы күштер әсер етпейтін немесе олардың қосындысы нөлге тең жүйе тұйық жүйе деп аталады.'
       }
     ]
   },
@@ -606,12 +538,17 @@ const lessonsData = {
     theory: `<h3>Гук заңы және серпімділік күші</h3>
              <p><b>Серпімділік күші</b> — дене деформацияланған кезде пайда болатын және оны бастапқы қалпына келтіруге тырысатын күш.</p>
              <h4>Заңдылық:</h4>
-             <p>Дененің созылу немесе сығылу деформациясы кезінде пайда болатын серпімділік күші оның ұзаруына тура пропорционал.</p>
-             <div class="glass-card flex-center" style="padding: 1.5rem; margin: 1rem 0; font-size: 1.5rem; font-weight: 800; color: var(--accent-orange); flex-direction: column; gap: 10px;">
+             <p>Дененің созылу немесе сығылу деформациясы кезінде пайда болатын серпімділік күші оның ұзаруына тура пропорционал және деформацияға қарама-қарсы бағытталады.</p>
+             <div class="glass-card flex-center" style="padding: 1.5rem; margin: 1rem 0; font-size: 1.8rem; font-weight: 800; color: var(--accent-orange); flex-direction: column; gap: 10px;">
                <div style="font-size: 0.9rem; color: var(--text-tertiary);" class="label-caps">Формула:</div>
                F = k · |x|
              </div>
-             <p>Мұндағы <b>F</b> — серпімділік күші (Н), <b>k</b> — қатаңдық коэффициенті (Н/м), <b>x</b> — ұзару (м).</p>`,
+             <p>Мұндағы: <b>F</b> — серпімділік күші (Н), <b>k</b> — қатаңдық (Н/м), <b>x</b> — абсолют ұзару (м).</p>
+             <h4>Деформацияланған дененің энергиясы:</h4>
+             <p>Серпімді деформацияланған серіппенің потенциалдық энергиясы:</p>
+             <div style="background: rgba(242, 109, 33, 0.05); padding: 1.2rem; border-radius: 12px; border: 1px dashed var(--accent-orange); font-weight: 700; text-align: center; margin: 1rem 0; font-size: 1.3rem;">
+               Eₚ = (k · x²) / 2
+             </div>`,
     quiz: [
       {
         question: 'Гук заңының формуласы қандай?',
@@ -647,14 +584,14 @@ const lessonsData = {
   }
 };
 
-function showStudentLessons() {
-  const view = document.getElementById('student-view');
+window.showStudentLessons = function(containerId = 'student-content', backFnName = 'renderStudentDashboard') {
+  const view = document.getElementById(containerId) || document.getElementById('student-view');
   if (!view) return;
 
   view.innerHTML = `
     <div class="glass-panel animate-fade-in" style="padding: 2.5rem; min-height: 80vh;">
       <div class="flex items-center gap-4" style="margin-bottom: 3rem;">
-        <button class="btn-secondary v-center h-center" style="width: 50px; height: 50px; border-radius: 50%; padding: 0; border: 1.5px solid var(--border-glass);" onclick="renderStudentDashboard()">
+        <button class="btn-secondary v-center h-center" style="width: 50px; height: 50px; border-radius: 50%; padding: 0; border: 1.5px solid var(--border-glass);" onclick="${backFnName}()">
           <i data-lucide="arrow-left" size="24"></i>
         </button>
         <div>
@@ -1106,13 +1043,11 @@ function toggleLessonSpeech() {
 
 function showStudentAchievements() {
   const content = document.getElementById('student-content');
+  if (!content) return;
   content.innerHTML = `
     <div class="animate-fade-in">
       <button class="btn-secondary v-center" style="margin-bottom: 2rem; gap: 0.5rem;" onclick="renderStudentDashboard()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"></line>
-          <polyline points="12 19 5 12 12 5"></polyline>
-        </svg>
+        <i data-lucide="arrow-left" size="18"></i>
         Артқа
       </button>
       <h2 class="gradient-text" style="font-size: 2rem; margin-bottom: 1.5rem;">Жетістіктерім</h2>
@@ -1137,29 +1072,86 @@ function showStudentAchievements() {
   lucide.createIcons();
 }
 
+function saveStudentProfile() {
+  state.studentProfile.name = document.getElementById('edit-student-name').value;
+  state.studentProfile.school = document.getElementById('edit-student-school').value;
+  state.studentProfile.grade = document.getElementById('edit-student-grade').value;
+
+  if (state.tempStudentAvatar) {
+    state.studentProfile.avatar = state.tempStudentAvatar;
+    delete state.tempStudentAvatar;
+  }
+
+  if (state.allStudents) {
+    const studentIndex = state.allStudents.findIndex(s => s.id === state.studentProfile.id);
+    if (studentIndex !== -1) {
+      state.allStudents[studentIndex].name = state.studentProfile.name;
+      state.allStudents[studentIndex].grade = state.studentProfile.grade;
+      state.allStudents[studentIndex].school = state.studentProfile.school;
+      state.allStudents[studentIndex].avatar = state.studentProfile.avatar;
+    }
+  }
+
+  saveState();
+  renderStudentDashboard();
+  if (window.speakText) window.speakText('Профиль мәліметтері сәтті сақталды.');
+}
+
+function showMyTeacherInfo() {
+  const content = document.getElementById('student-content');
+  if (!content) return;
+
+  const tp = state.teacherProfile;
+
+  content.innerHTML = `
+    <div class="animate-fade-in" style="max-width: 800px; margin: 0 auto;">
+      <button class="btn-secondary v-center" style="margin-bottom: 2rem; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="renderStudentDashboard()">
+        <i data-lucide="arrow-left" size="18"></i> Артқа
+      </button>
+
+      <div class="glass-card" style="padding: 1.5rem; position: relative; overflow: hidden; border-radius: 30px;">
+        <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: var(--primary-gradient); opacity: 0.05; border-radius: 50%;"></div>
+        
+        <div class="flex flex-col md-flex-row gap-8 items-center md-items-start">
+          <div style="width: 160px; height: 160px; border-radius: 50%; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; border: 5px solid white; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; flex-shrink: 0;">
+            ${tp.avatar ? `<img src="${tp.avatar}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i data-lucide="user" size="80" style="color: white;"></i>`}
+          </div>
+
+          <div style="flex: 1; text-align: left;">
+            <h2 class="gradient-text" style="font-size: 2.2rem; font-weight: 800; margin-bottom: 0.5rem;">${tp.name}</h2>
+            <p style="font-size: 1.1rem; color: var(--accent-orange); font-weight: 700; margin-bottom: 1.5rem; text-transform: uppercase;">${tp.category}</p>
+            
+            <div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+              <div class="glass-panel" style="padding: 1rem; border-radius: 16px; background: rgba(255,255,255,0.7);">
+                <span class="label-caps" style="font-size: 10px;">Пәні</span>
+                <p style="font-weight: 700; font-size: 1rem;">${tp.subject}</p>
+              </div>
+              <div class="glass-panel" style="padding: 1rem; border-radius: 16px; background: rgba(255,255,255,0.7);">
+                <span class="label-caps" style="font-size: 10px;">Мектебі</span>
+                <p style="font-weight: 700; font-size: 1rem;">${tp.school}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  lucide.createIcons();
+}
+
 function showStudentProfile(editMode = false) {
   const content = document.getElementById('student-content');
   if (!content) return;
 
+  const p = state.studentProfile;
+  const gradeOptions = ['7 А', '7 B', '8 А', '8 B', '9 А', '9 B'];
+  const gradeOptionsHtml = gradeOptions.map(g => `<option value="${g}" ${p.grade === g ? 'selected' : ''}>${g}</option>`).join('');
+
   if (editMode) {
-    const p = state.studentProfile;
-
-    // Generate grade options (7-11 grades, A, Ä, B sections)
-    const grades = [7, 8, 9, 10, 11];
-    const sections = ['А', 'Ә', 'Б'];
-    let gradeOptionsHtml = '';
-    grades.forEach(g => {
-      sections.forEach(s => {
-        const val = `${g} "${s}"`;
-        gradeOptionsHtml += `<option value='${val}' ${p.grade === val ? 'selected' : ''}>${val}</option>`;
-      });
-    });
-
     content.innerHTML = `
-      <div class="glass-card animate-fade-in" style="padding: 2.5rem; max-width: 600px; margin: 0 auto; border: 1px solid var(--border-glass); border-radius: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.05);">
-          <h2 class="gradient-text" style="font-size: 1.8rem; margin-bottom: 2rem; font-weight: 800;">Профильді өңдеу</h2>
-          
-          <!-- Avatar Upload -->
+      <div class="animate-fade-in" style="max-width: 600px; margin: 0 auto;">
+          <h2 class="gradient-text mb-6" style="font-size: 2rem;">Профильді өңдеу</h2>
+          <div class="glass-card" style="padding: 2rem;">
           <div class="flex flex-col items-center gap-2 mb-6">
             <div id="student-avatar-preview-container" onclick="document.getElementById('edit-student-avatar').click()" style="width: 120px; height: 120px; border-radius: 50%; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; border: 4px solid var(--border-glass); cursor: pointer; overflow: hidden; position: relative;">
               ${p.avatar ? `<img id="student-avatar-preview-img" src="${p.avatar}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i id="student-avatar-placeholder" data-lucide="user" size="48" style="color: var(--text-primary);"></i>`}
@@ -1190,9 +1182,9 @@ function showStudentProfile(editMode = false) {
               </div>
           </div>
       </div>
+    </div>
     `;
 
-    // File upload handler
     document.getElementById('edit-student-avatar').onchange = (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -1200,99 +1192,34 @@ function showStudentProfile(editMode = false) {
         reader.onload = (ev) => {
           state.tempStudentAvatar = ev.target.result;
           const container = document.getElementById('student-avatar-preview-container');
-          container.innerHTML = `
-            <img src="${ev.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
-            <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.4); padding: 4px; color: white; font-size: 10px; text-align: center; font-weight: 700;">ЖҮКТЕУ</div>
-          `;
+          container.innerHTML = `<img src="${ev.target.result}" style="width: 100%; height: 100%; object-fit: cover;">`;
         };
         reader.readAsDataURL(file);
       }
     };
-
+    lucide.createIcons();
+  } else {
+    content.innerHTML = `
+      <div class="animate-fade-in" style="max-width: 600px; margin: 0 auto;">
+        <div class="glass-card" style="padding: 3rem; text-align: center;">
+          <div style="width: 150px; height: 150px; border-radius: 50%; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; border: 5px solid white; box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin: 0 auto 2rem; overflow: hidden;">
+            ${p.avatar ? `<img src="${p.avatar}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i data-lucide="user" size="70" style="color: white;"></i>`}
+          </div>
+          <h2 class="gradient-text" style="font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem;">${p.name}</h2>
+          <p style="font-size: 1.2rem; color: var(--text-secondary); margin-bottom: 2rem;">Сыныбы: ${p.grade} | Мектебі: ${p.school}</p>
+          <div class="flex gap-4 justify-center">
+            <button class="btn-primary" style="padding: 1rem 2rem; border-radius: 15px;" onclick="showStudentProfile(true)">
+              <i data-lucide="edit-3" size="20"></i> Өңдеу
+            </button>
+            <button class="btn-secondary" style="padding: 1rem 2rem; border-radius: 15px;" onclick="renderStudentDashboard()">Басты бет</button>
+          </div>
+        </div>
+      </div>
+    `;
     lucide.createIcons();
   }
 }
 
-function saveStudentProfile() {
-  state.studentProfile.name = document.getElementById('edit-student-name').value;
-  state.studentProfile.school = document.getElementById('edit-student-school').value;
-  state.studentProfile.grade = document.getElementById('edit-student-grade').value;
-
-  if (state.tempStudentAvatar) {
-    state.studentProfile.avatar = state.tempStudentAvatar;
-    delete state.tempStudentAvatar;
-  }
-
-  // Sync with allStudents list (for the teacher's view)
-  if (state.allStudents) {
-    const studentIndex = state.allStudents.findIndex(s => s.id === state.studentProfile.id);
-    if (studentIndex !== -1) {
-      state.allStudents[studentIndex].name = state.studentProfile.name;
-      state.allStudents[studentIndex].grade = state.studentProfile.grade;
-      state.allStudents[studentIndex].school = state.studentProfile.school;
-      state.allStudents[studentIndex].avatar = state.studentProfile.avatar;
-    }
-  }
-
-  saveState();
-  renderStudentDashboard();
-  if (window.speakText) window.speakText('Профиль мәліметтері сәтті сақталды.');
-}
-
-function showMyTeacherInfo() {
-  const content = document.getElementById('student-content');
-  if (!content) return;
-
-  const tp = state.teacherProfile;
-
-  content.innerHTML = `
-    <div class="animate-fade-in" style="max-width: 800px; margin: 0 auto;">
-      <button class="btn-secondary v-center" style="margin-bottom: 2rem; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="renderStudentDashboard()">
-        <i data-lucide="arrow-left" size="18"></i> Артқа
-      </button>
-
-      <div class="glass-card" style="padding: 3rem; position: relative; overflow: hidden; border-radius: 30px;">
-        <!-- Background Decoration -->
-        <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: var(--primary-gradient); opacity: 0.05; border-radius: 50%;"></div>
-        
-        <div class="flex flex-col md-flex-row gap-8 items-center md-items-start">
-          <!-- Teacher Avatar -->
-          <div style="width: 160px; height: 160px; border-radius: 50%; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; border: 5px solid white; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; flex-shrink: 0;">
-            ${tp.avatar ? `<img src="${tp.avatar}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i data-lucide="user" size="80" style="color: white;"></i>`}
-          </div>
-
-          <div style="flex: 1; text-align: left;">
-            <h2 class="gradient-text" style="font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem;">${tp.name}</h2>
-            <p style="font-size: 1.2rem; color: var(--accent-orange); font-weight: 700; margin-bottom: 1.5rem; text-transform: uppercase; letter-spacing: 1px;">${tp.category}</p>
-            
-            <div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-              <div class="glass-panel" style="padding: 1.2rem; border-radius: 16px; background: rgba(255,255,255,0.7);">
-                <span class="label-caps" style="font-size: 10px;">Пәні</span>
-                <p style="font-weight: 700; font-size: 1.1rem; color: var(--text-primary);">${tp.subject}</p>
-              </div>
-              <div class="glass-panel" style="padding: 1.2rem; border-radius: 16px; background: rgba(255,255,255,0.7);">
-                <span class="label-caps" style="font-size: 10px;">Мектебі</span>
-                <p style="font-weight: 700; font-size: 1.1rem; color: var(--text-primary);">${tp.school}</p>
-              </div>
-              <div class="glass-panel" style="padding: 1.2rem; border-radius: 16px; background: rgba(255,255,255,0.7);">
-                <span class="label-caps" style="font-size: 10px;">Жұмыс өтілі</span>
-                <p style="font-weight: 700; font-size: 1.1rem; color: var(--text-primary);">${tp.experience}</p>
-              </div>
-            </div>
-
-            <div style="margin-top: 2rem; padding: 1.5rem; background: rgba(242, 109, 33, 0.05); border-left: 4px solid var(--accent-orange); border-radius: 0 16px 16px 0;">
-              <h4 class="label-caps" style="margin-bottom: 0.5rem; font-size: 11px;">Жетістіктері</h4>
-              <p style="color: var(--text-secondary); line-height: 1.6; font-style: italic;">"${tp.achievementsText}"</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-  lucide.createIcons();
-}
-
-// --- FREE FALL LABORATORY ---
 function renderFreeFallLab() {
   setTimeout(() => {
     updateFreeFallSim(50);
@@ -1300,72 +1227,90 @@ function renderFreeFallLab() {
   }, 100);
 
   return `
-    <div class="glass-panel animate-scale-in" style="padding: 2.5rem; margin-top: 1rem; border-radius: 32px; border: 1px solid var(--border-glass); background: white; position: relative;">
+    <div class="glass-panel animate-scale-in" style="padding: 1.2rem; margin-top: 1rem; border-radius: 32px; border: 1px solid var(--border-glass); background: white; position: relative;">
       
       <!-- Theory Section -->
-      <div class="grid gap-6" style="grid-template-columns: 1fr 1fr; margin-bottom: 2.5rem; background: #f8fafc; padding: 2rem; border-radius: 24px; border: 1px solid var(--border-glass);">
-        <div>
-          <h3 style="color: var(--accent-orange); font-size: 1.8rem; margin-bottom: 1rem; font-weight: 800;">Еркін түсуді зерттеу</h3>
-          <div style="display: flex; flex-direction: column; gap: 1rem;">
-            <p style="font-size: 1.1rem;"><strong style="color: var(--text-primary);"><i data-lucide="target" size="18" style="vertical-align: middle; margin-right: 8px;"></i> Мақсаты:</strong> Дененің еркін түсу уақыты мен жылдамдығының биіктікке тәуелділігін зерделеу.</p>
-            <div style="background: white; padding: 1rem; border-radius: 12px; border: 1px solid var(--border-glass);">
-               <p style="font-weight: 800; color: var(--accent-orange); margin-bottom: 0.5rem; font-size: 0.9rem;" class="label-caps">Формулалар:</p>
-               <div style="display: flex; gap: 3rem; font-size: 1.2rem; font-weight: 700; color: var(--text-primary);">
+      <div class="flex flex-col md-flex-row gap-4" style="margin-bottom: 2rem; background: #f8fafc; padding: 1.2rem; border-radius: 24px; border: 1px solid var(--border-glass);">
+        <div style="flex: 1; width: 100%;">
+          <h3 style="color: var(--accent-orange); font-size: 1.3rem; margin-bottom: 1rem; font-weight: 800;">Еркін түсуді зерттеу</h3>
+          <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+            <p style="font-size: 0.95rem;"><strong style="color: var(--text-primary);"><i data-lucide="target" size="18" style="vertical-align: middle; margin-right: 8px;"></i> Мақсаты:</strong> Дененің еркін түсу уақыты мен жылдамдығының биіктікке тәуелділігін зерделеу.</p>
+            <div style="background: white; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass);">
+               <p style="font-weight: 800; color: var(--accent-orange); margin-bottom: 0.5rem; font-size: 0.75rem;" class="label-caps">Формулалар:</p>
+               <div style="display: flex; flex-wrap: wrap; gap: 1rem; font-size: 1rem; font-weight: 700; color: var(--text-primary);">
                  <span>g = <div style="display: inline-block; vertical-align: middle; text-align: center;"><div style="border-bottom: 2px solid currentColor;">2h</div><div>t<sup>2</sup></div></div></span>
                  <span>g = <div style="display: inline-block; vertical-align: middle; text-align: center;"><div style="border-bottom: 2px solid currentColor;">v</div><div>t</div></div></span>
                </div>
             </div>
           </div>
         </div>
-        <div style="border-left: 1px solid var(--border-glass); padding-left: 2rem;">
-          <h4 style="font-weight: 800; color: var(--text-primary); margin-bottom: 0.8rem;">Орындалу реті:</h4>
-          <ul style="padding-left: 1.2rem; line-height: 1.8; color: var(--text-secondary); font-weight: 500; list-style-type: none;">
+        <div style="flex: 1; width: 100%; border-top: 2px solid var(--accent-orange); border-left: none; padding: 1.2rem 0 0 0;" class="md-theory-border">
+          <h4 style="font-weight: 800; color: var(--text-primary); margin-bottom: 0.8rem; font-size: 0.95rem;">Орындалу реті:</h4>
+          <ul style="padding-left: 0; line-height: 1.5; color: var(--text-secondary); font-weight: 500; list-style-type: none; font-size: 0.9rem;">
             <li class="v-center gap-2"><i data-lucide="check-circle-2" size="16" style="color: var(--accent-cyan);"></i> Биіктікті (h) таңдаңыз.</li>
             <li class="v-center gap-2"><i data-lucide="check-circle-2" size="16" style="color: var(--accent-cyan);"></i> "ТҮСІРУ" батырмасын басыңыз.</li>
-            <li class="v-center gap-2"><i data-lucide="check-circle-2" size="16" style="color: var(--accent-cyan);"></i> Уақыт пен жылдамдықты жазыңыз.</li>
-            <li class="v-center gap-2"><i data-lucide="check-circle-2" size="16" style="color: var(--accent-cyan);"></i> Калькулятормен g мәнін есептеңіз.</li>
+            <li class="v-center gap-2"><i data-lucide="check-circle-2" size="16" style="color: var(--accent-cyan);"></i> Уақыт пен жылдамдық мәндерін жазыңыз.</li>
+            <li class="v-center gap-2"><i data-lucide="check-circle-2" size="16" style="color: var(--accent-cyan);"></i> g мәнін есептеңіз.</li>
           </ul>
         </div>
       </div>
 
-      <div class="grid" style="grid-template-columns: 1fr 320px; gap: 2.5rem;">
+      <style>
+        @media (min-width: 768px) {
+          .md-theory-border { border-top: none !important; border-left: 2px solid var(--accent-orange) !important; padding: 0 0 0 1.2rem !important; }
+        }
+      </style>
+
+      <div class="flex flex-col md-flex-row gap-6">
         <!-- Left Side: Experiment & Controls -->
-        <div class="flex flex-col gap-4">
-          <div id="ff-sim-stage" style="height: 500px; background: linear-gradient(to bottom, #f0f9ff, #e0f2fe); border-radius: 24px; border: 1px solid var(--border-glass); position: relative; overflow: hidden; box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);">
+        <div class="flex flex-col gap-4" style="flex: 1.5; width: 100%;">
+          <div id="ff-sim-stage" style="height: 380px; background: linear-gradient(to bottom, #f0f9ff, #e0f2fe); border-radius: 24px; border: 1px solid var(--border-glass); position: relative; overflow: hidden; box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);">
             <!-- SVG injected here -->
           </div>
           
-          <div class="glass-panel flex justify-between items-center" style="padding: 1.2rem 2rem; border-radius: 20px; background: #f8fafc; border: 1px solid var(--border-glass);">
-            <div class="flex items-center gap-4">
-              <span class="label-caps" style="font-weight: 800; color: var(--text-secondary); font-size: 0.8rem;">Биіктік:</span>
+          <div class="glass-panel flex flex-col md-flex-row justify-between items-center gap-4" style="padding: 1rem; border-radius: 20px; background: #f8fafc; border: 1px solid var(--border-glass);">
+            <div class="flex flex-col md-flex-row items-center gap-3">
+              <span class="label-caps" style="font-weight: 800; color: var(--text-secondary); font-size: 0.75rem;">Биіктік:</span>
               <div class="flex gap-2">
-                <button class="lab-ff-btn" onclick="updateFreeFallSim(10)">10м</button>
-                <button class="lab-ff-btn active" onclick="updateFreeFallSim(50)">50м</button>
-                <button class="lab-ff-btn" onclick="updateFreeFallSim(100)">100м</button>
+                <button class="lab-ff-btn" onclick="updateFreeFallSim(10)" style="padding: 0.5rem 0.8rem; font-size: 0.85rem;">10м</button>
+                <button class="lab-ff-btn active" onclick="updateFreeFallSim(50)" style="padding: 0.5rem 0.8rem; font-size: 0.85rem;">50м</button>
+                <button class="lab-ff-btn" onclick="updateFreeFallSim(100)" style="padding: 0.5rem 0.8rem; font-size: 0.85rem;">100м</button>
               </div>
             </div>
             
-            <button class="btn-primary" onclick="startFreeFallAnim()" id="ff-start-btn" style="height: 56px; padding: 0 2.5rem; font-size: 1.2rem; font-weight: 900; border-radius: 16px; box-shadow: 0 8px 15px rgba(242, 109, 33, 0.25);">
-              <i data-lucide="play-circle" size="24" style="margin-right: 10px;"></i> ТҮСІРУ
+            <button class="btn-primary v-center gap-3" onclick="startFreeFallAnim()" id="ff-start-btn" style="padding: 0.8rem 1.2rem; border-radius: 12px; font-weight: 900; font-size: 0.95rem; box-shadow: 0 4px 12px rgba(242, 109, 33, 0.2); width: 100%;" class="md-w-auto">
+              <i data-lucide="play-circle" size="20"></i> ТҮСІРУ
             </button>
           </div>
         </div>
 
-        <!-- Right Side: Data & Tools -->
-        <div class="flex flex-col gap-4">
-          <div class="glass-card" style="padding: 2rem; background: white; border-left: 8px solid var(--accent-orange); border-radius: 24px; flex-grow: 1; display: flex; flex-direction: column; justify-content: center;">
-            <h4 class="v-center gap-2" style="font-weight: 800; font-size: 1.3rem; color: var(--text-primary); margin-bottom: 2rem;">
-              <i data-lucide="timer" size="24" style="color: var(--accent-orange);"></i> Мәліметтер
+        <!-- Right Side: Data -->
+        <div class="flex flex-col gap-4" style="flex: 1; width: 100%;">
+          <div class="glass-card" style="padding: 1.2rem; background: white; border-top: 6px solid var(--accent-orange); border-radius: 24px; height: 100%; display: flex; flex-direction: column; justify-content: center;">
+            <h4 class="v-center gap-2" style="font-weight: 800; font-size: 1.1rem; color: var(--text-primary); margin-bottom: 1.2rem;">
+              <i data-lucide="timer" size="20" style="color: var(--accent-orange);"></i> Мәліметтер
             </h4>
-            <div id="ff-data" style="font-size: 1.8rem; font-weight: 800; color: var(--text-primary); line-height: 2;">
-              Уақыт: <span style="color: var(--accent-orange); float: right;">0.00 с</span><br>
-              <div style="border-top: 1px solid var(--border-glass); margin: 1rem 0;"></div>
-              Жылдамдық: <span style="color: var(--accent-orange); float: right;">0.0 м/с</span>
+            <div id="ff-data" style="font-size: 1.3rem; font-weight: 800; color: var(--text-primary); line-height: 1.8;">
+              <div class="flex justify-between items-center">
+                <span style="font-size: 1rem;">Уақыт:</span>
+                <span style="color: var(--accent-orange);">0.00 с</span>
+              </div>
+              <div style="border-top: 1px solid var(--border-glass); margin: 0.6rem 0;"></div>
+              <div class="flex justify-between items-center">
+                <span style="font-size: 1rem;">Жылдамдық:</span>
+                <span style="color: var(--accent-orange);">0.0 м/с</span>
+              </div>
             </div>
           </div>
-          
         </div>
       </div>
+
+      <style>
+        @media (min-width: 768px) {
+          .md-w-auto { width: auto !important; }
+        }
+      </style>
+
 
     <style>
       .lab-ff-btn { padding: 0.6rem 1.2rem; border-radius: 12px; font-weight: 700; background: white; border: 1.5px solid var(--border-glass); cursor: pointer; transition: all 0.2s; }
@@ -1388,7 +1333,8 @@ function updateFreeFallSim(h) {
   const ballCy = holderY + 35;   // Ball sits centered below the holder
 
   stage.innerHTML = `
-    <svg width="100%" height="100%" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet">
+    <svg class="lab-svg" width="100%" height="100%" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet">
+
       <defs>
         <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" style="stop-color:#f0f9ff;stop-opacity:1" />
@@ -1415,11 +1361,21 @@ function updateFreeFallSim(h) {
       <text x="200" y="${holderY - 15}" text-anchor="middle" font-size="18" font-weight="900" fill="var(--accent-orange)" class="label-caps">Биіктік: ${h}м</text>
     </svg>
   `;
-  document.getElementById('ff-data').innerHTML = `Уақыт: <span style="color: var(--accent-orange);">0.00 с</span><br>Жылдамдық: <span style="color: var(--accent-orange);">0.0 м/с</span>`;
+  document.getElementById('ff-data').innerHTML = `
+    <div class="flex justify-between items-center">
+      <span>Уақыт:</span>
+      <span style="color: var(--accent-orange);">0.00 с</span>
+    </div>
+    <div style="border-top: 1px solid var(--border-glass); margin: 0.8rem 0;"></div>
+    <div class="flex justify-between items-center">
+      <span>Жылдамдық:</span>
+      <span style="color: var(--accent-orange);">0.0 м/с</span>
+    </div>
+  `;
   const startBtn = document.getElementById('ff-start-btn');
   if (startBtn) {
     startBtn.disabled = false;
-    startBtn.innerHTML = '<i data-lucide="play-circle" size="32"></i> ТҮСІРУ';
+    startBtn.innerHTML = '<i data-lucide="play-circle" size="22"></i> ТҮСІРУ';
     lucide.createIcons();
   }
 }
@@ -1453,13 +1409,33 @@ function startFreeFallAnim() {
 
       ball.setAttribute('cy', currentY);
       const currentV = g * elapsed;
-      dataEl.innerHTML = `Уақыт: <span style="color: var(--accent-orange);">${elapsed.toFixed(2)} с</span><br>Жылдамдық: <span style="color: var(--accent-orange);">${currentV.toFixed(1)} м/с</span>`;
+      dataEl.innerHTML = `
+        <div class="flex justify-between items-center">
+          <span>Уақыт:</span>
+          <span style="color: var(--accent-orange);">${elapsed.toFixed(2)} с</span>
+        </div>
+        <div style="border-top: 1px solid var(--border-glass); margin: 0.8rem 0;"></div>
+        <div class="flex justify-between items-center">
+          <span>Жылдамдық:</span>
+          <span style="color: var(--accent-orange);">${currentV.toFixed(1)} м/с</span>
+        </div>
+      `;
       requestAnimationFrame(anim);
     } else {
       ball.setAttribute('cy', groundY);
       const finalV = g * totalTime;
-      dataEl.innerHTML = `Уақыт: <span style="color: var(--accent-orange);">${totalTime.toFixed(2)} с</span><br>Жылдамдық: <span style="color: var(--accent-orange);">${finalV.toFixed(1)} м/с</span>`;
-      btn.innerHTML = '<i data-lucide="check-circle" size="32"></i> АЯҚТАЛДЫ';
+      dataEl.innerHTML = `
+        <div class="flex justify-between items-center">
+          <span>Уақыт:</span>
+          <span style="color: var(--accent-orange);">${totalTime.toFixed(2)} с</span>
+        </div>
+        <div style="border-top: 1px solid var(--border-glass); margin: 0.8rem 0;"></div>
+        <div class="flex justify-between items-center">
+          <span>Жылдамдық:</span>
+          <span style="color: var(--accent-orange);">${finalV.toFixed(1)} м/с</span>
+        </div>
+      `;
+      btn.innerHTML = '<i data-lucide="check-circle" size="22"></i> АЯҚТАЛДЫ';
       btn.classList.add('finished');
       lucide.createIcons();
       if (window.speakText) window.speakText(`Дене ${totalTime.toFixed(2)} секундта түсті. Соңғы жылдамдық секундына ${finalV.toFixed(1)} метр.`);
@@ -1467,7 +1443,7 @@ function startFreeFallAnim() {
       // Auto-reset after 3 seconds
       setTimeout(() => {
         btn.disabled = false;
-        btn.innerHTML = '<i data-lucide="play-circle" size="32"></i> ТҮСІРУ';
+        btn.innerHTML = '<i data-lucide="play-circle" size="22"></i> ТҮСІРУ';
         ball.setAttribute('cy', startY);
         lucide.createIcons();
       }, 3000);
@@ -1596,7 +1572,8 @@ function updateImpulseSim() {
   const r2 = 15 + (m2 * 3);
 
   stage.innerHTML = `
-    <svg id="imp-svg" width="100%" height="100%" viewBox="0 0 600 350">
+    <svg class="lab-svg" id="imp-svg" width="100%" height="100%" viewBox="0 0 600 350">
+
       <defs>
         <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" style="stop-color:#818cf8;stop-opacity:1" />
@@ -1625,6 +1602,76 @@ function updateImpulseSim() {
     </svg>
   `;
 }
+
+window.startImpulseAnim = function() {
+  const btn = document.getElementById('start-imp-btn');
+  const m1 = parseFloat(document.getElementById('m1-range').value);
+  const v1 = parseFloat(document.getElementById('v1-range').value);
+  const m2 = parseFloat(document.getElementById('m2-range').value);
+  const type = document.getElementById('collision-type').value;
+
+  if (v1 <= 0 || !btn) return;
+
+  // Disable Controls
+  btn.disabled = true;
+  document.getElementById('m1-range').disabled = true;
+  document.getElementById('v1-range').disabled = true;
+  document.getElementById('m2-range').disabled = true;
+  document.getElementById('collision-type').disabled = true;
+
+  const b1 = document.getElementById('ball1');
+  const b2 = document.getElementById('ball2');
+  const vVec = document.getElementById('v1-vector');
+  const r1 = parseFloat(b1.getAttribute('r'));
+  const r2 = parseFloat(b2.getAttribute('r'));
+
+  let cx1 = 80;
+  let cx2 = 350;
+  let curV1 = v1 * 1.5; // Scale for animation speed
+  let curV2 = 0;
+  let collided = false;
+
+  function step() {
+    cx1 += curV1;
+    cx2 += curV2;
+
+    b1.setAttribute('cx', cx1);
+    b2.setAttribute('cx', cx2);
+    if (vVec) vVec.setAttribute('display', 'none');
+
+    // Collision Check
+    if (!collided && (cx1 + r1 >= cx2 - r2)) {
+      collided = true;
+      cx1 = cx2 - r2 - r1; // Align exactly at impact
+
+      if (type === 'elastic') {
+        const v1_final = ((m1 - m2) * v1) / (m1 + m2);
+        const v2_final = (2 * m1 * v1) / (m1 + m2);
+        curV1 = v1_final * 1.5;
+        curV2 = v2_final * 1.5;
+      } else {
+        const v_final = (m1 * v1) / (m1 + m2);
+        curV1 = v_final * 1.5;
+        curV2 = v_final * 1.5;
+      }
+    }
+
+    // Stop condition
+    if (cx1 > 650 || cx1 < -50 || cx2 > 650) {
+      btn.disabled = false;
+      document.getElementById('m1-range').disabled = false;
+      document.getElementById('v1-range').disabled = false;
+      document.getElementById('m2-range').disabled = false;
+      document.getElementById('collision-type').disabled = false;
+      updateImpulseSim(); // Reset to initial state after animation
+      return;
+    }
+
+    requestAnimationFrame(step);
+  }
+
+  requestAnimationFrame(step);
+};
 
 
 // Vessels Lab State
@@ -1848,7 +1895,8 @@ function updateHookeSim() {
   const weightSize = 40 + (m * 20);
 
   stage.innerHTML = `
-    <svg width="100%" height="100%" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet">
+    <svg class="lab-svg" width="100%" height="100%" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet">
+
       <defs>
         <linearGradient id="springGrad" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" style="stop-color:#94a3b8" />
@@ -1952,7 +2000,7 @@ window.onload = () => {
   initSnowfall();
 };
 
-function showResourceLibrary(containerId = 'student-content', backFnName = 'renderStudentDashboard') {
+window.showResourceLibrary = function(containerId = 'student-content', backFnName = 'renderStudentDashboard') {
   const content = document.getElementById(containerId) || document.getElementById('student-view');
   if (!content) return;
 
