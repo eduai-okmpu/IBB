@@ -7,69 +7,76 @@ function showLabDetails(id) {
   if (!lab) return;
   
   const view = document.getElementById('labs-view');
+  
+  // Decide what to render in the main panel
+  let simulationHtml = '';
+  
+  if (lab.phetUrl) {
+    simulationHtml = `
+      <div class="glass-panel" style="height: 100%; padding: 0; overflow: hidden; border-radius: 20px; background: #000; position: relative; border: 1px solid var(--border-glass);">
+        <iframe src="${lab.phetUrl}" style="width: 100%; height: 600px; border: none;" allowfullscreen></iframe>
+      </div>
+    `;
+  } else if (lab.key === 'freefall' && typeof renderFreeFallLab === 'function') {
+    simulationHtml = renderFreeFallLab();
+  } else if (lab.key === 'gravity' && typeof renderGravityLab === 'function') {
+    simulationHtml = renderGravityLab();
+  } else if (lab.key === 'archimedes' && typeof renderArchimedesLab === 'function') {
+    simulationHtml = renderArchimedesLab();
+  } else {
+    simulationHtml = `
+      <div class="glass-panel flex-center flex-col gap-4 text-center" style="height: 100%; color: var(--text-tertiary); background: rgba(255,255,255,0.2); border: 2px dashed var(--border-glass);">
+        <i data-lucide="monitor-off" size="48" style="opacity: 0.3;"></i>
+        <p>Симуляция жүктелуде немесе қолжетімсіз...</p>
+      </div>
+    `;
+  }
+
   view.innerHTML = `
-    <div class="flex flex-col gap-6 animate-fade-in" style="height: 100%;">
+    <div class="flex flex-col gap-6 animate-fade-in" style="height: 100%; padding-bottom: 2rem;">
       <div class="flex justify-between items-center">
         <div class="flex items-center gap-4">
-          <button class="btn-secondary v-center h-center" style="width: 40px; height: 40px; border-radius: 50%; padding: 0;" onclick="renderLabs()">
-            <i data-lucide="arrow-left" size="20"></i>
+          <button class="btn-secondary v-center h-center" style="width: 50px; height: 50px; border-radius: 50%; padding: 0; border: 1.5px solid var(--border-glass);" onclick="renderLabs()" title="Тізімге қайту">
+            <i data-lucide="arrow-left" size="24"></i>
           </button>
           <div>
-            <h2 class="gradient-text" style="font-size: 1.8rem;">${lab.title}</h2>
-            <p style="color: var(--text-secondary); font-size: 0.9rem;">Зертханалық жұмыс №${lab.id}</p>
+            <h2 class="gradient-text" style="font-size: 2rem; font-weight: 800;">${lab.title}</h2>
+            <p style="color: var(--text-secondary); font-size: 1rem; font-weight: 600;">Зертханалық жұмыс №${lab.id}</p>
           </div>
         </div>
-        <div class="flex gap-2">
-          <button class="btn-secondary v-center" style="gap: 0.5rem;" onclick="speak('${lab.title}. ${lab.desc}')">
+        <div class="flex gap-3">
+          <button class="btn-primary v-center" style="gap: 0.6rem; padding: 0.8rem 1.5rem; font-size: 1rem; border-radius: 40px;" onclick="speak('${lab.title}. ${lab.desc}')">
             <i data-lucide="volume-2" size="20"></i> Дыбыстау
-          </button>
-          <button class="btn-primary v-center" style="gap: 0.5rem;" onclick="window.open('${lab.phetUrl.replace('_en.html', '_en.html')}', '_blank')">
-            <i data-lucide="external-link" size="20"></i> Толық экран
           </button>
         </div>
       </div>
       
-      <div class="grid" style="grid-template-columns: 350px 1fr; gap: 1.5rem; flex-grow: 1;">
+      <div class="grid" style="grid-template-columns: 350px 1fr; gap: 2rem; align-items: start;">
         <!-- Left Panel: Instructions -->
-        <aside class="flex flex-col gap-4 overflow-y-auto" style="max-height: 70vh;">
-          <div class="glass-card" style="padding: 1.5rem; border-left: 4px solid var(--accent-cyan);">
-            <h3 class="v-center gap-2" style="font-size: 1.1rem; margin-bottom: 1rem;">
-              <i data-lucide="target" size="18" style="color: var(--accent-cyan);"></i> Жұмыс мақсаты
+        <aside class="flex flex-col gap-4 overflow-y-auto" style="max-height: 80vh; scrollbar-width: none; background: rgba(0,0,0,0.01); padding: 0.5rem; border-radius: 20px;">
+          <div class="glass-card" style="padding: 1.5rem; border-left: 6px solid var(--accent-cyan); background: white;">
+            <h3 class="v-center gap-2" style="font-size: 1.2rem; margin-bottom: 0.8rem; font-weight: 800;">
+              <i data-lucide="target" size="20" style="color: var(--accent-cyan);"></i> Жұмыс мақсаты
             </h3>
-            <p style="font-size: 0.95rem; line-height: 1.5;">${lab.desc}</p>
+            <p style="font-size: 1rem; line-height: 1.5; color: var(--text-primary); font-weight: 500;">${lab.desc}</p>
           </div>
           
-          <div class="glass-card" style="padding: 1.5rem;">
-            <h3 class="v-center gap-2" style="font-size: 1.1rem; margin-bottom: 1rem;">
-              <i data-lucide="list-checks" size="18" style="color: var(--accent-orange);"></i> Жұмыс барысы
+          <div class="glass-card" style="padding: 1.5rem; background: white; border: 1px solid var(--border-glass);">
+            <h3 class="v-center gap-2" style="font-size: 1.2rem; margin-bottom: 0.8rem; font-weight: 800;">
+              <i data-lucide="list-checks" size="20" style="color: var(--accent-orange);"></i> Жұмыс барысы
             </h3>
-            <div style="font-size: 0.9rem; display: flex; flex-direction: column; gap: 0.8rem;">
-              <p><strong>1.</strong> Ашылған симуляция терезесінде "Play" батырмасын басыңыз.</p>
-              <p><strong>2.</strong> Параметрлерді (масса, ұзындық, кернеу т.б.) тақырыпқа сай реттеңіз.</p>
-              <p><strong>3.</strong> Өлшеу құралдарын (сызғыш, амперметр, секундомер) пайдаланып, деректерді жазып алыңыз.</p>
-              <p><strong>4.</strong> Тәжірибені 3 рет қайталап, орташа мәнін есептеңіз.</p>
-              <p><strong>5.</strong> Қорытынды жасаңыз: алынған нәтиже теориялық заңдылыққа сәйкес келе ме?</p>
+            <div style="font-size: 1rem; display: flex; flex-direction: column; gap: 0.8rem; line-height: 1.4; color: var(--text-secondary); font-weight: 500;">
+              <p><strong style="color: var(--accent-orange);">1.</strong> Параметрлерді таңдаңыз.</p>
+              <p><strong style="color: var(--accent-orange);">2.</strong> Тәжірибені бастаңыз.</p>
+              <p><strong style="color: var(--accent-orange);">3.</strong> Мәліметтерді бақылаңыз.</p>
+              <p><strong style="color: var(--accent-orange);">4.</strong> Қорытынды жасаңыз.</p>
             </div>
           </div>
+        </aside> 
 
-          <div class="glass-card" style="padding: 1.5rem; background: rgba(var(--accent-purple-rgb), 0.05);">
-             <h4 class="v-center gap-2" style="font-size: 1rem; margin-bottom: 0.5rem;">
-               <i data-lucide="help-circle" size="16"></i> Көмек керек пе?
-             </h4>
-             <p style="font-size: 0.85rem; opacity: 0.8;">Симуляциямен жұмыс істеу қиындық тудырса, AI Көмекшіге хабарласыңыз.</p>
-          </div>
-        </aside>
-
-        <!-- Main Panel: PhET Simulation -->
-        <div class="glass-panel" style="padding: 0; overflow: hidden; border-radius: 20px; background: #000; border: 2px solid var(--border-glass);">
-          <iframe 
-            src="${lab.phetUrl}" 
-            width="100%" 
-            height="100%" 
-            scrolling="no" 
-            allowfullscreen 
-            style="border: none; min-height: 500px;">
-          </iframe>
+        <!-- Main Panel: Simulation -->
+        <div id="simulation-container" style="min-height: 600px; display: flex; flex-direction: column;">
+          ${simulationHtml}
         </div>
       </div>
     </div>
@@ -79,5 +86,6 @@ function showLabDetails(id) {
 }
 
 function speakLabInstructions(topic) {
-  speak(`${topic} жұмысының барысы: Бірінші. Штативке жіпті бекітіп, оның ұзындығын өлшеңіз. Екінші. Маятникті он-он бес градусқа ауытқытып, еркін жіберіңіз. Үшінші. Он толық тербеліс жасауға кеткен уақытты өлшеңіз. Төртінші. Периодын және жиілігін есептеңіз.`);
+  speak(`${topic} жұмысының барысы: Бірінші. Параметрлерді реттеп, тәжірибені бастаңыз. Екінші. Алынған мәліметтерді кестеге енгізіңіз. Үшінші. Тәжірибені бірнеше рет қайталаңыз.`);
 }
+

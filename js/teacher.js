@@ -2,98 +2,298 @@
  * PhysicsAccess - Teacher Logic (Premium UI & 120 Questions)
  */
 
+let currentTeacherChatId = null;
+
 function showAIAssistant() {
   const content = document.getElementById('teacher-content');
+  
+  // If no chat selected, create or pick latest
+  if (!currentTeacherChatId) {
+    if (state.teacherAIChats.length > 0) {
+      currentTeacherChatId = state.teacherAIChats[state.teacherAIChats.length - 1].id;
+    } else {
+      createNewTeacherAIChat();
+    }
+  }
+
+  const chat = state.teacherAIChats.find(c => c.id === currentTeacherChatId) || state.teacherAIChats[0];
+
   content.innerHTML = `
-    <button class="btn-secondary voice-target" onclick="renderTeacherDashboard()" style="margin-bottom: 2rem; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;">
-      <i data-lucide="arrow-left" size="18"></i> Басты бетке қайту
-    </button>
-    <div class="glass-card animate-fade-in" style="padding: 3rem;">
-        <h2 class="voice-target heading-page" style="margin-bottom: 2rem;">AI Көмекші — Сабақ жоспары</h2>
-        <div class="flex flex-col gap-6">
-          <p class="voice-target" style="font-size: 1.1rem; color: var(--text-secondary);">Кез келмелген физика тақырыбын енгізіңіз (мысалы: "Кинематика", "Ньютон заңдары"):</p>
-          <div style="display: flex; gap: 1rem;">
-            <input type="text" id="ai-input" placeholder="Тақырып атауын жазыңыз..." class="glass-panel" style="flex: 1; padding: 1.2rem; border-radius: 12px; border: 1px solid var(--border-glass); background: var(--bg-glass-bright); font-size: 1.1rem;">
-            <button class="btn-primary" style="padding: 0 2.5rem; font-size: 1.1rem;" onclick="generateAIContent()">Жасау</button>
-          </div>
-          <div id="ai-output" style="margin-top: 1rem;"></div>
+    <div class="flex flex-col animate-fade-in" style="height: 75vh; gap: 1.5rem;">
+      <div class="flex justify-between items-center">
+        <button class="btn-secondary voice-target" onclick="renderTeacherDashboard()" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;">
+          <i data-lucide="arrow-left" size="18"></i> Басты бет
+        </button>
+        <div class="flex items-center" style="gap: 0.75rem;">
+          <button class="btn-secondary v-center gap-2" onclick="showTeacherAIHistory()" style="padding: 0.6rem 1.2rem; border-radius: 12px;">
+            <i data-lucide="history" size="18"></i> Тарих
+          </button>
+          <button class="btn-primary v-center gap-2" onclick="createNewTeacherAIChat()" style="padding: 0.6rem 1.2rem; border-radius: 12px;">
+            <i data-lucide="plus" size="18"></i> Жаңа чат
+          </button>
         </div>
+      </div>
+
+      <div class="glass-card flex flex-col" style="flex: 1; padding: 0; overflow: hidden; border-radius: 24px;">
+        <!-- Chat Header -->
+        <div style="padding: 1.2rem 2rem; border-bottom: 1px solid var(--border-glass); background: rgba(255,255,255,0.3); display: flex; align-items: center; gap: 1rem;">
+          <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; color: white;">
+            <i data-lucide="bot" size="20"></i>
+          </div>
+          <div>
+            <h3 style="font-size: 1.1rem; font-weight: 800;">AI Көмекші</h3>
+            <p style="font-size: 0.8rem; color: var(--text-secondary);">${chat ? chat.title : 'Жаңа сөйлесу'}</p>
+          </div>
+        </div>
+
+        <!-- Chat Messages -->
+        <div id="teacher-chat-messages" style="flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; background: rgba(255,255,255,0.1);">
+          <!-- Messages will be rendered here -->
+        </div>
+
+        <!-- Chat Input -->
+        <div style="padding: 1.5rem; border-top: 1px solid var(--border-glass); background: #fff;">
+          <div class="flex" style="gap: 1rem;">
+            <input type="text" id="teacher-chat-input" placeholder="Сұрақ қойыңыз немесе тақырыпты жазыңыз..." 
+                   class="glass-panel" style="flex: 1; padding: 1rem 1.5rem; border-radius: 15px; border: 1px solid var(--border-glass); outline: none;"
+                   onkeypress="if(event.key === 'Enter') sendTeacherAIMessage()">
+            <button class="btn-primary" onclick="sendTeacherAIMessage()" style="width: 50px; height: 50px; padding: 0; border-radius: 15px; display: flex; align-items: center; justify-content: center;">
+              <i data-lucide="send" size="20"></i>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   `;
+  
+  renderTeacherChatMessages();
   lucide.createIcons();
 }
 
-function generateAIContent() {
-  const topic = document.getElementById('ai-input').value;
-  if (!topic) return;
-  const output = document.getElementById('ai-output');
-  output.innerHTML = `<div class="flex items-center gap-3 py-4"><div class="animate-spin" style="width: 24px; height: 24px; border: 3px solid var(--accent-orange); border-top-color: transparent; border-radius: 50%;"></div><p class="voice-target">AI мазмұн жасалуда... Күте тұрыңыз.</p></div>`;
-  
-  setTimeout(() => {
-    output.innerHTML = `
-      <div class="animate-fade-in flex flex-col gap-8 mt-4">
-        <article class="glass-card" style="border-left: 4px solid var(--accent-orange);">
-          <div class="flex justify-between items-center" style="margin-bottom: 1.5rem;">
-            <h3 class="gradient-text" style="font-size: 1.4rem;">Қысқа мерзімді жоспар (ҚМЖ)</h3>
-            <button class="btn-secondary" style="padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.9rem;"><i data-lucide="download" size="16"></i> PDF</button>
-          </div>
-          <div style="display: flex; flex-direction: column; gap: 1rem;">
-             <p><strong>Тақырып:</strong> ${topic}</p>
-             <p><strong>Оқу мақсаттары:</strong><br>• ${topic} заңдылықтарын түсіндіру.<br>• Формулаларды есептерде қолдану.</p>
-          </div>
-        </article>
-      </div>
-    `;
-    lucide.createIcons();
-    speak("AI мазмұн сәтті жасалды.");
-  }, 1500);
+function createNewTeacherAIChat() {
+  const newChat = {
+    id: Date.now(),
+    title: 'Жаңа сөйлесу',
+    messages: [
+      { role: 'ai', text: 'Сәлеметсіз бе! Мен сіздің AI көмекшіңізбін. Сабақ жоспарын құруға, есептер шығаруға немесе физикадан кез келген сұраққа жауап беруге дайынмын.', time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }
+    ],
+    lastUpdate: new Date()
+  };
+  state.teacherAIChats.push(newChat);
+  currentTeacherChatId = newChat.id;
+  showAIAssistant();
 }
 
-function showClassManager() {
+function renderTeacherChatMessages() {
+  const container = document.getElementById('teacher-chat-messages');
+  if (!container) return;
+  
+  const chat = state.teacherAIChats.find(c => c.id === currentTeacherChatId);
+  if (!chat) return;
+
+  container.innerHTML = chat.messages.map(msg => `
+    <div class="animate-scale-in" style="display: flex; flex-direction: column; align-items: ${msg.role === 'user' ? 'flex-end' : 'flex-start'}; gap: 0.3rem; max-width: 85%; align-self: ${msg.role === 'user' ? 'flex-end' : 'flex-start'};">
+      <div style="padding: 1rem 1.2rem; border-radius: ${msg.role === 'user' ? '20px 20px 0 20px' : '20px 20px 20px 0'}; 
+                  background: ${msg.role === 'user' ? 'var(--primary-gradient)' : '#fff'}; 
+                  color: ${msg.role === 'user' ? '#fff' : 'var(--text-primary)'};
+                  box-shadow: 0 4px 15px rgba(0,0,0,0.05); font-size: 1rem; line-height: 1.5; border: ${msg.role === 'ai' ? '1px solid var(--border-glass)' : 'none'};">
+        ${msg.text.replace(/\n/g, '<br>')}
+      </div>
+      <span style="font-size: 0.7rem; color: var(--text-tertiary); margin: 0 0.5rem;">${msg.time}</span>
+    </div>
+  `).join('');
+  
+  container.scrollTop = container.scrollHeight;
+}
+
+function sendTeacherAIMessage() {
+  const input = document.getElementById('teacher-chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const chat = state.teacherAIChats.find(c => c.id === currentTeacherChatId);
+  if (!chat) return;
+
+  // Add User Message
+  const userMsg = { role: 'user', text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+  chat.messages.push(userMsg);
+  chat.lastUpdate = new Date();
+  
+  // Set title based on first user message if it's still "New Chat"
+  if (chat.title === 'Жаңа сөйлесу') {
+    chat.title = text.length > 25 ? text.substring(0, 25) + '...' : text;
+  }
+
+  input.value = '';
+  renderTeacherChatMessages();
+  playSound('correct');
+
+  // AI Typing indicator
+  const container = document.getElementById('teacher-chat-messages');
+  const typingId = 'typing-' + Date.now();
+  const typingHtml = `
+    <div id="${typingId}" class="animate-fade-in" style="align-self: flex-start; background: #fff; padding: 1rem 1.2rem; border-radius: 20px 20px 20px 0; border: 1px solid var(--border-glass); display: flex; gap: 4px;">
+      <div class="dot-typing" style="width: 6px; height: 6px; border-radius: 50%; background: var(--accent-orange); animation: dotPulse 1.5s infinite 0s;"></div>
+      <div class="dot-typing" style="width: 6px; height: 6px; border-radius: 50%; background: var(--accent-orange); animation: dotPulse 1.5s infinite 0.2s;"></div>
+      <div class="dot-typing" style="width: 6px; height: 6px; border-radius: 50%; background: var(--accent-orange); animation: dotPulse 1.5s infinite 0.4s;"></div>
+    </div>
+  `;
+  container.insertAdjacentHTML('beforeend', typingHtml);
+  container.scrollTop = container.scrollHeight;
+
+  // Simulate AI Response
+  setTimeout(() => {
+    const typingElem = document.getElementById(typingId);
+    if (typingElem) typingElem.remove();
+
+    let aiText = `Сіздің "${text}" туралы сұранысыңыз бойынша материал дайындадым. `;
+    if (text.toLowerCase().includes('ө жоспар') || text.toLowerCase().includes('сабақ')) {
+      aiText += `\n\n**Сабақ жоспары: ${text}**\n1. Ұйымдастыру кезеңі (5 мин)\n2. Өткен тақырыпты қайталау (10 мин)\n3. Жаңа материалды түсіндіру (20 мин)\n4. Есептер шығару (10 мин)\n5. Қорытынды.`;
+    } else {
+      aiText += `\n\nБұл тақырып бойынша қосымша мәліметтер керек болса немесе есеп шығару қажет болса, хабарласыңыз. Мен сізге көмектесуге әрқашан дайынмын.`;
+    }
+
+    const aiMsg = { role: 'ai', text: aiText, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+    chat.messages.push(aiMsg);
+    chat.lastUpdate = new Date();
+    
+    renderTeacherChatMessages();
+    speak("Жаңа хабарлама келді.");
+    lucide.createIcons();
+  }, 1800);
+}
+
+function showTeacherAIHistory() {
   const content = document.getElementById('teacher-content');
   
-  // Parse teacher's classes for filtering
-  const teacherClassesRaw = state.teacherProfile.classes || '';
-  const teacherClasses = teacherClassesRaw.split(',').map(c => c.trim().replace(/"/g, ''));
+  const sortedChats = [...state.teacherAIChats].sort((a, b) => new Date(b.lastUpdate) - new Date(a.lastUpdate));
+
+  content.innerHTML = `
+    <div class="flex flex-col animate-fade-in" style="height: 75vh; gap: 1.5rem;">
+      <div class="flex justify-between items-center">
+        <button class="btn-secondary voice-target" onclick="showAIAssistant()" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;">
+          <i data-lucide="arrow-left" size="18"></i> Чатқа қайту
+        </button>
+        <h2 class="gradient-text" style="font-size: 1.8rem; font-weight: 800;">Сұраныстар тарихы</h2>
+      </div>
+
+      <div class="glass-card flex flex-col gap-3" style="flex: 1; padding: 1.5rem; overflow-y: auto;">
+        ${sortedChats.length === 0 ? `
+          <div class="flex-center flex-col gap-4" style="height: 100%; opacity: 0.5;">
+            <i data-lucide="message-square-off" size="64"></i>
+            <p>Тарих бос...</p>
+          </div>
+        ` : sortedChats.map(chat => `
+          <div class="glass-panel voice-target" onclick="loadTeacherAIChat(${chat.id})" 
+               style="padding: 1.5rem; border-radius: 16px; border: 1px solid var(--border-glass); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s;">
+            <div class="flex items-center gap-4">
+              <div style="width: 45px; height: 45px; border-radius: 12px; background: rgba(var(--accent-orange-rgb), 0.1); color: var(--accent-orange); display: flex; align-items: center; justify-content: center;">
+                <i data-lucide="message-circle" size="24"></i>
+              </div>
+              <div>
+                <h4 style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.2rem;">${chat.title}</h4>
+                <p style="font-size: 0.8rem; color: var(--text-tertiary);">${chat.messages.length} хабарлама • ${new Date(chat.lastUpdate).toLocaleDateString()}</p>
+              </div>
+            </div>
+            <i data-lucide="chevron-right" size="20" style="color: var(--text-tertiary);"></i>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
   
-  // Available classes for filtering (from teacher's profile)
-  const availableClasses = teacherClassesRaw.split(',').map(c => c.trim());
+  lucide.createIcons();
+}
+
+function loadTeacherAIChat(id) {
+  currentTeacherChatId = id;
+  showAIAssistant();
+}
+
+
+let currentManagerTab = 'list'; // 'list' or 'results'
+
+window.showClassManager = function() {
+  const content = document.getElementById('teacher-class-view');
+  
+  const teacherClassesRaw = state.teacherProfile.classes || '';
+  const availableClasses = teacherClassesRaw.split(',').map(c => c.trim().replace(/["']/g, '')).filter(c => c);
   
   content.innerHTML = `
-    <button class="btn-secondary voice-target" onclick="renderTeacherDashboard()" style="margin-bottom: 2rem; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;">
+    <div class="animate-fade-in" style="padding: 2rem 0;">
+    <button class="btn-secondary voice-target" onclick="navigate('teacher')" style="margin-bottom: 2rem; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;">
       <i data-lucide="arrow-left" size="18"></i> Басты бетке қайту
     </button>
     
-    <div class="glass-card animate-fade-in" style="padding: 2.5rem;">
-      <div class="flex justify-between items-center" style="margin-bottom: 2.5rem;">
+    <div class="glass-card" style="padding: 2.5rem; min-height: 600px;">
+      <div class="flex justify-between items-center" style="margin-bottom: 2.1rem;">
         <div>
-          <h2 class="voice-target gradient-text" style="font-size: 2rem; font-weight: 800; margin-bottom: 0.5rem;">Сынып менеджері</h2>
-          <p style="color: var(--text-secondary);">Оқушыларыңыздың үлгерімін бақылаңыз</p>
+          <h2 class="voice-target gradient-text" style="font-size: 2rem; font-weight: 800; margin-bottom: 0.5rem;">Менің сыныбым</h2>
+          <p style="color: var(--text-secondary);">Оқушылар тізімі мен үлгерімін бақылаңыз</p>
         </div>
-        <div class="flex items-center gap-3">
-          <label class="label-caps" style="margin-bottom: 0;">Сынып:</label>
-          <select id="teacher-class-filter" class="glass-panel" style="padding: 0.6rem 1.5rem; border-radius: 12px; outline: none; border: 1px solid var(--border-glass); cursor: pointer;" onchange="filterClassManager()">
-            <option value="all">Барлық сыныптар</option>
-            ${availableClasses.map(c => `<option value="${c}">${c}</option>`).join('')}
-          </select>
+        <div class="flex items-center gap-4">
+          <div class="v-center glass-panel" style="padding: 0.5rem 1rem; border-radius: 12px; border: 1px solid var(--border-glass); background: #fff;">
+            <i data-lucide="search" size="18" style="color: var(--text-tertiary); margin-right: 0.5rem;"></i>
+            <input type="text" id="class-manager-search" placeholder="Оқушыны іздеу..." style="border: none; outline: none; background: transparent; font-size: 0.95rem; width: 180px;" oninput="filterClassManager()">
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="label-caps" style="margin-bottom: 0;">Сынып:</label>
+            <select id="teacher-class-filter" class="glass-panel" style="padding: 0.6rem 1rem; border-radius: 12px; outline: none; border: 1px solid var(--border-glass); cursor: pointer;" onchange="filterClassManager()">
+              <option value="all">Барлық сыныптар</option>
+              ${availableClasses.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+          </div>
+          ${currentManagerTab === 'list' ? `
+            <button class="btn-primary v-center gap-2" style="padding: 0.6rem 1.2rem; border-radius: 12px; cursor: pointer; position: relative; z-index: 10;" onclick="showAddStudentModal()">
+              <i data-lucide="user-plus" size="18"></i> Оқушы қосу
+            </button>
+          ` : ''}
         </div>
+      </div>
+
+      <!-- Tab Switcher -->
+      <div class="flex gap-4" style="margin-bottom: 2rem; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.5rem;">
+        <button class="tab-btn ${currentManagerTab === 'list' ? 'active' : ''}" onclick="switchManagerTab('list')" style="background: none; border: none; padding: 0.8rem 1.5rem; font-weight: 700; cursor: pointer; color: ${currentManagerTab === 'list' ? 'var(--accent-orange)' : 'var(--text-tertiary)'}; border-bottom: 2px solid ${currentManagerTab === 'list' ? 'var(--accent-orange)' : 'transparent'}; transition: all 0.2s;">
+          <i data-lucide="users" size="18" style="vertical-align: middle; margin-right: 0.5rem;"></i> Оқушылар тізімі
+        </button>
+        <button class="tab-btn ${currentManagerTab === 'results' ? 'active' : ''}" onclick="switchManagerTab('results')" style="background: none; border: none; padding: 0.8rem 1.5rem; font-weight: 700; cursor: pointer; color: ${currentManagerTab === 'results' ? 'var(--accent-orange)' : 'var(--text-tertiary)'}; border-bottom: 2px solid ${currentManagerTab === 'results' ? 'var(--accent-orange)' : 'transparent'}; transition: all 0.2s;">
+          <i data-lucide="bar-chart-2" size="18" style="vertical-align: middle; margin-right: 0.5rem;"></i> Үлгерім нәтижелері
+        </button>
       </div>
 
       <div style="overflow-x: auto;">
           <table style="width: 100%; border-collapse: separate; border-spacing: 0 12px;">
-            <thead>
-              <tr class="label-caps" style="text-align: left; opacity: 0.6;">
-                <th style="padding: 0 1rem 1rem 1rem;">Оқушы</th>
-                <th style="padding: 0 1rem 1rem 1rem;">Сынып</th>
-                <th style="padding: 0 1rem 1rem 1rem;">Тақырып</th>
-                <th style="padding: 0 1rem 1rem 1rem;">Нәтиже</th>
-                <th style="padding: 0 1rem 1rem 1rem;">Күні</th>
-              </tr>
+            <thead id="manager-thead">
+              <!-- Content generated by filterClassManager() -->
             </thead>
             <tbody id="class-manager-tbody">
               <!-- Content generated by filterClassManager() -->
             </tbody>
           </table>
+      </div>
+    </div>
+    </div>
+
+    <!-- Add Student Modal -->
+    <div id="add-student-modal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px); z-index: 9999; align-items: center; justify-content: center;">
+      <div class="glass-card animate-scale-in" style="width: 100%; max-width: 500px; padding: 3rem; background: #fff;">
+        <div class="flex justify-between items-center" style="margin-bottom: 2rem;">
+          <h3 style="font-size: 1.5rem; font-weight: 800;">Жаңа оқушы қосу</h3>
+          <button class="btn-secondary" onclick="closeAddStudentModal()" style="padding: 0.5rem; border-radius: 50%;"><i data-lucide="x"></i></button>
+        </div>
+        <div class="flex flex-col gap-5">
+          <div class="flex flex-col gap-2">
+            <label class="label-caps">Оқушының аты-жөні:</label>
+            <input type="text" id="new-student-name" placeholder="Мысалы: Дархан Саматұлы" class="glass-panel" style="padding: 1rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.02);">
+          </div>
+          <div class="flex flex-col gap-2">
+            <label class="label-caps">Сыныбы:</label>
+            <select id="new-student-grade" class="glass-panel" style="padding: 1rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.02);">
+              ${availableClasses.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+          </div>
+          <button class="btn-primary" onclick="addNewStudentToState()" style="margin-top: 1rem; padding: 1.2rem; border-radius: 12px; font-weight: 700;">Сақтау</button>
+        </div>
       </div>
     </div>
   `;
@@ -102,201 +302,527 @@ function showClassManager() {
   lucide.createIcons();
 }
 
-function filterClassManager() {
-  const filterVal = document.getElementById('teacher-class-filter').value;
-  const tbody = document.getElementById('class-manager-tbody');
-  
-  // Results filtered by teacher's classes
-  const teacherClassesRaw = state.teacherProfile.classes || '';
-  const teacherClasses = teacherClassesRaw.split(',').map(c => c.trim());
-  
-  let filteredResults = state.quizResults.filter(res => {
-    const resGrade = res.grade.trim();
-    // Must be in teacher's classes
-    if (!teacherClasses.some(tc => tc.trim() === resGrade)) return false;
-    // Follow the specific filter
-    if (filterVal !== 'all' && resGrade !== filterVal) return false;
-    return true;
-  });
+window.switchManagerTab = function(tab) {
+  currentManagerTab = tab;
+  showClassManager();
+}
 
-  if (filteredResults.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="5" style="text-align: center; padding: 3rem; color: var(--text-tertiary);">
-          <i data-lucide="info" size="48" style="margin-bottom: 1rem; opacity: 0.2;"></i>
-          <p>Мәліметтер табылмады</p>
-        </td>
-      </tr>
-    `;
+window.showAddStudentModal = function() {
+  const modal = document.getElementById('add-student-modal');
+  if (modal) {
+    modal.style.display = 'flex';
     lucide.createIcons();
+  }
+}
+
+window.closeAddStudentModal = function() {
+  const modal = document.getElementById('add-student-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+window.addNewStudentToState = function() {
+  const name = document.getElementById('new-student-name').value.trim();
+  const grade = document.getElementById('new-student-grade').value;
+  
+  if (!name) {
+    alert("Оқушының атын енгізіңіз");
     return;
   }
 
-  tbody.innerHTML = filteredResults.map(res => {
-    const percentage = Math.round((res.score / res.maxScore) * 100);
-    let scoreColor = '#4CAF50';
-    if (percentage < 50) scoreColor = '#F44336';
-    else if (percentage < 85) scoreColor = '#FFC107';
+  const newStudent = {
+    id: Date.now(),
+    name: name,
+    grade: grade,
+    points: 0,
+    level: 1,
+    school: state.teacherProfile.school || '№15 ІТ мектеп-лицейі'
+  };
 
-    return `
-      <tr style="background: rgba(255,255,255,0.4); backdrop-filter: blur(8px); border-radius: 16px; margin-bottom: 10px; transition: transform 0.2s ease;" class="voice-target">
-        <td style="padding: 1.2rem; border-radius: 16px 0 0 16px; font-weight: 700; color: var(--text-primary);">${res.studentName}</td>
-        <td style="padding: 1.2rem; color: var(--text-secondary);">${res.grade}</td>
-        <td style="padding: 1.2rem; font-size: 0.9rem; color: var(--text-secondary);">${res.topic}</td>
-        <td style="padding: 1.2rem;">
-          <div class="flex items-center gap-3">
-             <div style="flex: 1; height: 8px; background: rgba(0,0,0,0.05); border-radius: 10px; overflow: hidden; width: 100px;">
-                <div style="width: ${percentage}%; height: 100%; background: ${scoreColor}; border-radius: 10px;"></div>
-             </div>
-             <span style="font-weight: 800; color: ${scoreColor}; min-width: 45px;">${res.score}/${res.maxScore}</span>
-          </div>
-        </td>
-        <td style="padding: 1.2rem; border-radius: 0 16px 16px 0; color: var(--text-tertiary); font-size: 0.8rem;">${res.date}</td>
+  state.allStudents.push(newStudent);
+  saveState();
+  closeAddStudentModal();
+  filterClassManager();
+  if (window.playSound) window.playSound('correct');
+  if (window.speakText) window.speakText('Жаңа оқушы тізімге қосылды.');
+}
+
+window.deleteStudentFromState = function(id) {
+  if (!confirm("Оқушыны тізімнен өшіруді мақұлдайсыз ба?")) return;
+  state.allStudents = state.allStudents.filter(s => s.id !== id);
+  saveState();
+  filterClassManager();
+}
+
+window.filterClassManager = function() {
+  const filterVal = document.getElementById('teacher-class-filter').value;
+  const searchVal = document.getElementById('class-manager-search').value.toLowerCase();
+  const thead = document.getElementById('manager-thead');
+  const tbody = document.getElementById('class-manager-tbody');
+  
+  const teacherClassesRaw = state.teacherProfile.classes || '';
+  const teacherClasses = teacherClassesRaw.split(',').map(c => c.trim().replace(/["']/g, ''));
+
+  if (currentManagerTab === 'results') {
+    // RENDER RESULTS VIEW
+    thead.innerHTML = `
+      <tr class="label-caps" style="text-align: left; opacity: 0.6;">
+        <th style="padding: 0 1rem 1rem 1rem;">Оқушы</th>
+        <th style="padding: 0 1rem 1rem 1rem;">Сынып</th>
+        <th style="padding: 0 1rem 1rem 1rem;">Тақырып</th>
+        <th style="padding: 0 1rem 1rem 1rem;">Нәтиже</th>
+        <th style="padding: 0 1rem 1rem 1rem;">Күні</th>
       </tr>
     `;
-  }).join('');
+
+    let filteredResults = state.quizResults.filter(res => {
+      const resGrade = (res.grade || '').trim().toLowerCase().replace(/["']/g, '').replace(/[aа]/g, 'а').replace(/[eе]/g, 'е').replace(/[oо]/g, 'о').replace(/[kк]/g, 'к');
+      const matchesSearch = (res.studentName || '').toLowerCase().includes(searchVal);
+      
+      const isInTeacherClass = teacherClasses.some(tc => {
+        const cleanTc = tc.trim().toLowerCase().replace(/["']/g, '').replace(/[aа]/g, 'а').replace(/[eе]/g, 'е').replace(/[oо]/g, 'о').replace(/[kк]/g, 'к');
+        return cleanTc === resGrade;
+      });
+
+      if (filterVal !== 'all' && !isInTeacherClass) return false;
+      if (filterVal !== 'all' && resGrade !== filterVal.toLowerCase().replace(/["']/g, '').replace(/[aа]/g, 'а').replace(/[eе]/g, 'е').replace(/[oо]/g, 'о').replace(/[kк]/g, 'к')) return false;
+      if (searchVal && !matchesSearch) return false;
+      return true;
+    });
+
+    if (filteredResults.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 3rem; color: var(--text-tertiary);">Мәліметтер табылмады</td></tr>`;
+    } else {
+      tbody.innerHTML = filteredResults.map(res => {
+        const percentage = Math.round((res.score / res.maxScore) * 100);
+        let scoreColor = percentage < 50 ? '#F44336' : (percentage < 85 ? '#FFC107' : '#4CAF50');
+        return `
+          <tr style="background: rgba(255,255,255,0.4); backdrop-filter: blur(8px); border-radius: 16px; transition: transform 0.2s ease;">
+            <td style="padding: 1.2rem; border-radius: 16px 0 0 16px; font-weight: 700;">${res.studentName}</td>
+            <td style="padding: 1.2rem;">${res.grade}</td>
+            <td style="padding: 1.2rem; font-size: 0.9rem;">${res.topic}</td>
+            <td style="padding: 1.2rem;">
+              <div class="flex items-center gap-3">
+                 <div style="flex: 1; height: 8px; background: rgba(0,0,0,0.05); border-radius: 10px; overflow: hidden; width: 100px;">
+                    <div style="width: ${percentage}%; height: 100%; background: ${scoreColor}; border-radius: 10px;"></div>
+                 </div>
+                 <span style="font-weight: 800; color: ${scoreColor};">${res.score}/${res.maxScore}</span>
+              </div>
+            </td>
+            <td style="padding: 1.2rem; border-radius: 0 16px 16px 0; font-size: 0.8rem; color: var(--text-tertiary);">${res.date}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+  } else {
+    // RENDER STUDENT LIST VIEW
+    thead.innerHTML = `
+      <tr class="label-caps" style="text-align: left; opacity: 0.6;">
+        <th style="padding: 0 1rem 1rem 1rem;">Оқушы</th>
+        <th style="padding: 0 1rem 1rem 1rem;">Сынып</th>
+        <th style="padding: 0 1rem 1rem 1rem;">Мектеп</th>
+        <th style="padding: 0 1rem 1rem 1rem; text-align: right;">Әрекет</th>
+      </tr>
+    `;
+
+    let filteredStudents = state.allStudents.filter(s => {
+      const sGrade = (s.grade || '').trim().toLowerCase().replace(/["']/g, '').replace(/[aа]/g, 'а').replace(/[eе]/g, 'е').replace(/[oо]/g, 'о').replace(/[kк]/g, 'к');
+      const matchesSearch = (s.name || '').toLowerCase().includes(searchVal);
+      
+      const isInTeacherClass = teacherClasses.some(tc => {
+        const cleanTc = tc.trim().toLowerCase().replace(/["']/g, '').replace(/[aа]/g, 'а').replace(/[eе]/g, 'е').replace(/[oо]/g, 'о').replace(/[kк]/g, 'к');
+        return cleanTc === sGrade;
+      });
+
+      if (filterVal !== 'all' && !isInTeacherClass) return false;
+      if (filterVal !== 'all' && sGrade !== filterVal.toLowerCase().replace(/["']/g, '').replace(/[aа]/g, 'а').replace(/[eе]/g, 'е').replace(/[oо]/g, 'о').replace(/[kк]/g, 'к')) return false;
+      if (searchVal && !matchesSearch) return false;
+      return true;
+    }).sort((a,b) => a.name.localeCompare(b.name));
+
+    if (filteredStudents.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 3rem; color: var(--text-tertiary);">Оқушылар табылмады</td></tr>`;
+    } else {
+      tbody.innerHTML = filteredStudents.map(s => `
+        <tr style="background: rgba(255,255,255,0.4); backdrop-filter: blur(8px); border-radius: 16px; transition: transform 0.2s ease;">
+          <td style="padding: 1.2rem; border-radius: 16px 0 0 16px;">
+            <div class="flex items-center gap-3">
+              <div style="width: 35px; height: 35px; border-radius: 50%; background: var(--primary-gradient); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.8rem;">${s.name.charAt(0)}</div>
+              <span style="font-weight: 700;">${s.name}</span>
+            </div>
+          </td>
+          <td style="padding: 1.2rem;">${s.grade}</td>
+          <td style="padding: 1.2rem; font-size: 0.85rem; color: var(--text-secondary);">${s.school}</td>
+          <td style="padding: 1.2rem; border-radius: 0 16px 16px 0; text-align: right;">
+            <button class="btn-secondary" style="padding: 0.5rem; border-radius: 10px; color: #ef4444;" onclick="deleteStudentFromState(${s.id})"><i data-lucide="trash-2" size="18"></i></button>
+          </td>
+        </tr>
+      `).join('');
+    }
+  }
   
   lucide.createIcons();
 }
 
 
+
 const physicsDb = {
-  questions: {
+  "questions": {
     "Механика": [
-        { q: "Күштің өлшем бірлігі қандай?", options: ["Ньютон (Н)", "Паскаль (Па)", "Джоуль (Дж)", "Ватт (Вт)"], answer: 0 },
-        { q: "Энергияның физикалық мағынасы қандай?", options: ["Дененің жұмыс істеу қабілеті", "Қозғалыс жылдамдығы", "Дененің массасы", "Кедергі күші"], answer: 0 },
-        { q: "Архимед заңы қандай параметрлерге байланысты?", options: ["Сұйықтың тығыздығы мен батқан бөліктің көлеміне", "Сұйықтың массасына", "Дененің пішініне", "Ауа қысымына"], answer: 0 },
-        { q: "Үдеудің өлшем бірлігі?", options: ["м/с²", "м/с", "м", "кг"], answer: 0 },
-        { q: "Ньютонның екінші заңы?", options: ["F = ma", "F = m/a", "a = F*m", "P = mv"], answer: 0 },
-        { q: "Жұмыс формуласы?", options: ["A = Fs", "A = P/t", "A = mgh", "A = v/t"], answer: 0 },
-        { q: "Кинетикалық энергия формуласы?", options: ["Ek = mv²/2", "Ep = mgh", "Ek = ma", "Ek = mv"], answer: 0 },
-        { q: "Қысым формуласы?", options: ["P = F/S", "P = S/F", "P = m/V", "P = v*t"], answer: 0 },
-        { q: "Еркін түсу үдеуі шамамен қаншаға тең (g)?", options: ["9.8 м/с²", "10 м/с²", "8.9 м/с²", "11 м/с²"], answer: 0 },
-        { q: "Импульс формуласы?", options: ["p = mv", "p = m/v", "p = Ft", "p = ma"], answer: 0 },
-        { q: "Траектория дегеніміз не?", options: ["Нүктенің қозғалыс кезінде қалдырған ізі", "Қозғалыс жылдамдығы", "Орын ауыстыру", "Физикалық үдеріс"], answer: 0 },
-        { q: "Күш моменті формуласы?", options: ["M = Fd", "M = Fs", "M = ma", "M = mgh"], answer: 0 },
-        { q: "Гук заңының формуласы?", options: ["F = -kx", "F = ma", "F = mg", "F = Gmm/r²"], answer: 0 },
-        { q: "Қуаттың өлшем бірлігі қандай?", options: ["Ватт (Вт)", "Джоуль (Дж)", "Ньютон (Н)", "Паскаль (Па)"], answer: 0 },
-        { q: "Инерция дегеніміз не?", options: ["Дененің қозғалыс күйін сақтау қасиеті", "Қозғалыс жылдамдығы", "Үйкеліс күші", "Дененің тоқтауы"], answer: 0 },
-        { q: "Серпімділік күші қай кезде пайда болады?", options: ["Дене деформацияланғанда", "Дене қозғалғанда", "Дене тыныштықта болғанда", "Дене қызғанда"], answer: 0 },
-        { q: "Салмақ дегеніміз не?", options: ["Дененің тірекке немесе аспаға әсер ету күші", "Дененің массасы", "Жердің тарту күші", "Дененің көлемі"], answer: 0 },
-        { q: "Потенциалдық энергия формуласы?", options: ["Ep = mgh", "Ek = mv²/2", "E = mc²", "A = Fs"], answer: 0 },
-        { q: "Орташа жылдамдықтың формуласы?", options: ["v = S_барлық / t_барлық", "v = S * t", "v = t / S", "v = a * t"], answer: 0 },
-        { q: "Бірқалыпты емес қозғалыс кезіндегі үдеу?", options: ["жылдамдықтың өзгеру жылдамдығы", "тұрақты жылдамдық", "жолдың ұзындығы", "күштің шамасы"], answer: 0 },
-        { q: "Атмосфералық қысымды өлшейтін құрал?", options: ["Барометр", "Термометр", "Манометр", "Динамометр"], answer: 0 },
-        { q: "Манометр не үшін қолданылады?", options: ["Сұйық немесе газдың қысымын өлшеу үшін", "Температураны өлшеу үшін", "Күшті өлшеу үшін", "Массаны өлшеу үшін"], answer: 0 },
-        { q: "Көлбеу жазықтық не береді?", options: ["Күштен ұтыс", "Жолдан ұтыс", "Жұмыстан ұтыс", "Ешқандай ұтыс бермейді"], answer: 0 },
-        { q: "Қатты денелердегі үйкеліс түрлері?", options: ["Сырғанау, домалау, тыныштық", "Сулы, құрғақ", "Жылдам, баяу", "Күшті, әлсіз"], answer: 0 },
-        { q: "Дененің тығыздығы формуласы?", options: ["ρ = m/V", "ρ = V/m", "ρ = m*V", "ρ = m+V"], answer: 0 },
-        { q: "Механикалық тербеліс жиілігінің өлшем бірлігі?", options: ["Герц (Гц)", "Секунд (с)", "Метр (м)", "Ньютон (Н)"], answer: 0 },
-        { q: "Математикалық маятниктің тербеліс периоды?", options: ["Жіптің ұзындығына байланысты", "Массаға байланысты", "Амплитудаға байланысты", "Пішінге байланысты"], answer: 0 },
-        { q: "Бүкіләлемдік тартылыс заңы кімдікі?", options: ["Исаак Ньютон", "Галилео Галилей", "Рене Декарт", "Альберт Эйнштейн"], answer: 0 },
-        { q: "Пайдалы әсер коэффициенті (ПӘК) әрқашан?", options: ["100%-дан кіші", "100%-дан үлкен", "100%-ға тең", "200%-ға тең"], answer: 0 },
-        { q: "Дыбыстың ауадағы жылдамдығы шамамен?", options: ["340 м/с", "300 000 км/с", "1500 м/с", "100 м/с"], answer: 0 }
+      {
+        "q": "Күштің өлшем бірлігі қандай?",
+        "options": [
+          "Ньютон (Н)",
+          "Паскаль (Па)",
+          "Джоуль (Дж)",
+          "Ватт (Вт)"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Энергияның физикалық мағынасы қандай?",
+        "options": [
+          "Дененің жұмыс істеу қабілеті",
+          "Қозғалыс жылдамдығы",
+          "Дененің массасы",
+          "Кедергі күші"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Архимед заңы қандай параметрлерге байланысты?",
+        "options": [
+          "Сұйықтың тығыздығы мен батқан бөліктің көлеміне",
+          "Сұйықтың массасына",
+          "Дененің пішініне",
+          "Ауа қысымына"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Үдеудің өлшем бірлігі?",
+        "options": [
+          "м/с²",
+          "м/с",
+          "м",
+          "кг"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Ньютонның екінші заңы?",
+        "options": [
+          "F = ma",
+          "F = m/a",
+          "a = F*m",
+          "P = mv"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Жұмыс формуласы?",
+        "options": [
+          "A = Fs",
+          "A = P/t",
+          "A = mgh",
+          "A = v/t"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Кинетикалық энергия формуласы?",
+        "options": [
+          "Ek = mv²/2",
+          "Ep = mgh",
+          "Ek = ma",
+          "Ek = mv"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Қысым формуласы?",
+        "options": [
+          "P = F/S",
+          "P = S/F",
+          "P = m/V",
+          "P = v*t"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Еркін түсу үдеуі шамамен қаншаға тең (g)?",
+        "options": [
+          "9.8 м/с²",
+          "10 м/с²",
+          "8.9 м/с²",
+          "11 м/с²"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Импульс формуласы?",
+        "options": [
+          "p = mv",
+          "p = m/v",
+          "p = Ft",
+          "p = ma"
+        ],
+        "answer": 0
+      }
     ],
     "Термодинамика": [
-        { q: "Температураның абсолют нөлі?", options: ["-273.15 °C", "0 °C", "-100 °C", "-373.15 °C"], answer: 0 },
-        { q: "Термодинамиканың бірінші заңы?", options: ["Q = ΔU + A", "Q = ΔU - A", "U = Q + A", "ΔU = Q / A"], answer: 0 },
-        { q: "Заттың үш күйі?", options: ["Қатты, сұйық, газ", "Су, мұз, бу", "От, су, жер", "Металл, бейметалл"], answer: 0 },
-        { q: "Қайнау температурасы (қалыпты жағдайда)?", options: ["100 °C", "0 °C", "50 °C", "373 K"], answer: 0 },
-        { q: "Газ заңдары (Изобаралық)?", options: ["V/T = const", "P/T = const", "PV = const", "P/V = const"], answer: 0 },
-        { q: "Менделеев-Клапейрон теңдеуі?", options: ["PV = nRT", "PV = T", "P/T = R", "V = nRT"], answer: 0 },
-        { q: "Ішкі энергия дегеніміз не?", options: ["Молекулалардың жылулық қозғалысы мен өзара әрекеттесу энергиясы", "Кинетикалық энергия", "Потенциалдық энергия", "Орташа жылдамдық"], answer: 0 },
-        { q: "Жылулық сыйымдылық бірлігі?", options: ["Дж/(кг·К)", "Дж", "Вт", "Кельвин"], answer: 0 },
-        { q: "Идеал газдың ішкі энергиясы тек неге байланысты?", options: ["Температураға", "Көлемге", "Қысымға", "Пішінге"], answer: 0 },
-        { q: "Булану кезінде температура қалай өзгереді?", options: ["Тұрақты болып қалады", "Өседі", "Кемиді", "0-ге дейін түседі"], answer: 0 },
-        { q: "Жылу қозғалтқыштарының ПӘК-і әрқашан?", options: ["1-ден кіші", "1-ден үлкен", "1-ге тең", "0-ге тең"], answer: 0 },
-        { q: "Конвекция қай жерде жүруі мүмкін?", options: ["Сұйықтар мен газдарда", "Қатты денелерде", "Вакуумде", "Тек металдарда"], answer: 0 },
-        { q: "Сәуле шығару арқылы жылу берілу?", options: ["Вакуумде де жүреді", "Тек ауада жүреді", "Тек жанасу арқылы", "Тек су арқылы"], answer: 0 },
-        { q: "Отынның жану жылуы формуласы?", options: ["Q = qm", "Q = cmΔt", "Q = Lm", "Q = λm"], answer: 0 },
-        { q: "Меншікті балқу жылуының белгіленуі?", options: ["λ (лямбда)", "c", "q", "L"], answer: 0 },
-        { q: "Парциал қысым дегеніміз не?", options: ["Қоспа құрамындағы жеке газдың қысымы", "Жалпы қысым", "Атмосфералық қысым", "Сұйық қысымы"], answer: 0 },
-        { q: "Салыстырмалы ылғалдылықты өлшейтін құрал?", options: ["Психрометр", "Термометр", "Барометр", "Манометр"], answer: 0 },
-        { q: "Суның үштік нүктесі?", options: ["Мұз, су және бу тепе-теңдікте болатын күй", "Қайнау нүктесі", "Балқу нүктесі", "Булану нүктесі"], answer: 0 },
-        { q: "Изотермиялық процесс?", options: ["T = const", "V = const", "P = const", "Q = 0"], answer: 0 },
-        { q: "Изохоралық процесс?", options: ["V = const", "T = const", "P = const", "U = const"], answer: 0 },
-        { q: "Адиабаталық процесс?", options: ["Q = 0", "T = const", "V = const", "P = const"], answer: 0 },
-        { q: "Кельвин шкаласы бойынша 0 градус Цельсий?", options: ["273.15 K", "0 K", "-273.15 K", "100 K"], answer: 0 },
-        { q: "Меншікті булану жылуының бірлігі?", options: ["Дж/кг", "Дж", "Дж/(кг·К)", "Вт"], answer: 0 },
-        { q: "Диффузия дегеніміз?", options: ["Заттардың бір-біріне өздігінен араласуы", "Қайнау", "Сыну", "Шағылысу"], answer: 0 },
-        { q: "Броундық қозғалыс немен дәлелденеді?", options: ["Молекулалардың үздіксіз хаосты қозғалысымен", "Дененің қызуымен", "Дененің массасымен", "Күшпен"], answer: 0 },
-        { q: "Жылулық тепе-теңдік?", options: ["Жанасқан денелердің температураларының теңесуі", "Массалардың теңесуі", "Көлемдердің теңесуі", "Қысымдардың теңесуі"], answer: 0 },
-        { q: "Судың 4 °C-тағы қасиеті?", options: ["Ең жоғары тығыздыққа ие", "Қайнайды", "Балқиды", "Ең төмен тығыздық"], answer: 0 },
-        { q: "Психрометрдің екі термометрі?", options: ["Құрғақ және ылғалды", "Сұйық және газды", "Металл және шыны", "Сынапты және спиртті"], answer: 0 },
-        { q: "Идеал газ моделі?", options: ["Молекулалар өлшемі ескерілмейтін газ", "Су буы", "Ауа", "Нақты газ"], answer: 0 },
-        { q: "Қаныққан бу?", options: ["Өз сұйығымен динамикалық тепе-теңдіктегі бу", "Сулы бу", "Ыстық бу", "Мөлдір бу"], answer: 0 }
+      {
+        "q": "Температураның абсолют нөлі?",
+        "options": [
+          "-273.15 °C",
+          "0 °C",
+          "-100 °C",
+          "-373.15 °C"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Термодинамиканың бірінші заңы?",
+        "options": [
+          "Q = ΔU + A",
+          "Q = ΔU - A",
+          "U = Q + A",
+          "ΔU = Q / A"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Заттың үш күйі?",
+        "options": [
+          "Қатты, сұйық, газ",
+          "Су, мұз, бу",
+          "От, су, жер",
+          "Металл, бейметалл"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Қайнау температурасы (қалыпты жағдайда)?",
+        "options": [
+          "100 °C",
+          "0 °C",
+          "50 °C",
+          "373 K"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Газ заңдары (Изобаралық)?",
+        "options": [
+          "V/T = const",
+          "P/T = const",
+          "PV = const",
+          "P/V = const"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Менделеев-Клапейрон теңдеуі?",
+        "options": [
+          "PV = nRT",
+          "PV = T",
+          "P/T = R",
+          "V = nRT"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Ішкі энергия неге байланысты (идеал газ үшін)?",
+        "options": [
+          "Температураға",
+          "Көлемге",
+          "Қысымға",
+          "Массаға"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Жылулық сыйымдылық бірлігі?",
+        "options": [
+          "Дж/(кг·К)",
+          "Дж",
+          "Вт",
+          "Кельвин"
+        ],
+        "answer": 0
+      }
     ],
     "Электр және магнетизм": [
-        { q: "Кернеудің өлшем бірлігі?", options: ["Вольт (В)", "Ампер (А)", "Ом", "Ватт (Вт)"], answer: 0 },
-        { q: "Ток күшіның формуласы?", options: ["I = U/R", "U = I/R", "R = U*I", "I = q*t"], answer: 0 },
-        { q: "Қарсыласудың өлшем бірлігі?", options: ["Ом", "Фарадей", "Генри", "Тесла"], answer: 0 },
-        { q: "Кулон заңы?", options: ["F = k*q1*q2/r²", "F = ma", "F = mg", "F = BIl"], answer: 0 },
-        { q: "Электр сыйымдылығы бірлігі?", options: ["Фарадей (Ф)", "Кулон (Кл)", "Вольт (В)", "Генри (Гн)"], answer: 0 },
-        { q: "Тізбектей жалғау формуласы (R)?", options: ["R = R1 + R2", "1/R = 1/R1 + 1/R2", "R = R1*R2", "R = R1/R2"], answer: 0 },
-        { q: "Магнит индукциясының өлшем бірлігі?", options: ["Тесла (Тл)", "Вебер (Вб)", "Генри (Гн)", "Ом (Ω)"], answer: 0 },
-        { q: "Джоуль-Ленц заңы?", options: ["Q = I²Rt", "Q = UIt", "Q = IRt", "Q = P t"], answer: 0 },
-        { q: "Электр тізбегінің қуат формуласы?", options: ["P = UI", "P = U/I", "P = I²R", "P = F v"], answer: 0 },
-        { q: "Лоренц күші дегеніміз?", options: ["Магнит өрісіндегі қозғалыстағы зарядқа әсер ететін күш", "Тогы бар өткізгішке әсер ететін күш", "Серпімділік күші", "Үйкеліс күші"], answer: 0 },
-        { q: "Ампер күші формуласы?", options: ["F = BIl sin(α)", "F = qvB sin(α)", "F = ma", "F = k q/r²"], answer: 0 },
-        { q: "Тұрақты магниттің неше полюсі бар?", options: ["Екі (Солтүстік және Оңтүстік)", "Бір", "Төрт", "Полюсі болмайды"], answer: 0 },
-        { q: "Электр тогының химиялық әсері байқалады?", options: ["Электролиттерде", "Металдарда", "Газдарда", "Вакуумде"], answer: 0 },
-        { q: "Диэлектриктер дегеніміз?", options: ["Электр тогын өткізбейтін заттар", "Жақсы өткізгіштер", "Тек магниттер", "Сұйықтар"], answer: 0 },
-        { q: "Өткізгіштердің параллель жалғануында не тұрақты?", options: ["Кернеу (U)", "Ток күші (I)", "Қарсыласу (R)", "Қуат (P)"], answer: 0 },
-        { q: "Электромагниттің күшін қалай арттыруға болады?", options: ["Орам санын көбейту арқылы", "Орам санын азайту арқылы", "Ток күшін азайту арқылы", "Магнитті алып тастау арқылы"], answer: 0 },
-        { q: "Амперметр тізбекке қалай жалғанады?", options: ["Тізбектей", "Параллель", "Аралас", "Жалғанбайды"], answer: 0 },
-        { q: "Вольтметр тізбекке қалай жалғанады?", options: ["Параллель", "Тізбектей", "Кездейсоқ", "Тікелей"], answer: 0 },
-        { q: "Қысқа тұйықталу кезінде ток күші?", options: ["Шексіз артады", "Кемиді", "Өзгермейді", "Нөлге тең болады"], answer: 0 },
-        { q: "Трансформатордың қызметі қандай?", options: ["Кернеуді өзгерту", "Токты тудыру", "Энергияны сақтау", "Кедергіні жою"], answer: 0 },
-        { q: "Электр өрісінің кернеулігі бірлігі?", options: ["В/м", "Н", "Кл", "Ом"], answer: 0 },
-        { q: "Магнит ағынының өлшем бірлігі?", options: ["Вебер (Вб)", "Тесла", "Генри", "Фарадей"], answer: 0 },
-        { q: "Өздік индукция құбылысы?", options: ["Тізбектегі ток өзгергенде қосымша токтың пайда болуы", "Магниттің қозғалысы", "Жарықтың сынуы", "Химиялық реакция"], answer: 0 },
-        { q: "Индуктивтілік бірлігі?", options: ["Генри (Гн)", "Вебер", "Тесла", "Вольт"], answer: 0 },
-        { q: "Конденсатор не үшін қолданылады?", options: ["Электр зарядын жинақтау үшін", "Токты арттыру үшін", "Кедергіні азайту үшін", "Жарық шығару үшін"], answer: 0 },
-        { q: "Ом заңы (тізбек бөлігі үшін)?", options: ["I = U/R", "U = IR", "R = U/I", "P = UI"], answer: 0 },
-        { q: "Жартылай өткізгіштердегі негізгі заряд тасушылар?", options: ["Электрондар мен кемтіктер", "Тек протондар", "Иондар", "Нейтрондар"], answer: 0 },
-        { q: "Электромагниттік индукция заңын ашқан?", options: ["Майкл Фарадей", "Джеймс Максвелл", "Алессандро Вольта", "Андре Ампер"], answer: 0 },
-        { q: "Ток күшін өлшейтін құрал?", options: ["Амперметр", "Вольтметр", "Омметр", "Ваттметр"], answer: 0 }
+      {
+        "q": "Кернеудің өлшем бірлігі?",
+        "options": [
+          "Вольт (В)",
+          "Ампер (А)",
+          "Ом",
+          "Ватт (Вт)"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Ток күшіның формуласы?",
+        "options": [
+          "I = U/R",
+          "U = I/R",
+          "R = U*I",
+          "I = q*t"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Қарсыласудың өлшем бірлігі?",
+        "options": [
+          "Ом",
+          "Фарадей",
+          "Генри",
+          "Тесла"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Ом заңы?",
+        "options": [
+          "I = U/R",
+          "U = IR",
+          "R = U/I",
+          "P = UI"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Кулон заңы?",
+        "options": [
+          "F = k*q1*q2/r²",
+          "F = ma",
+          "F = mg",
+          "F = BIl"
+        ],
+        "answer": 0
+      }
     ],
     "Оптика": [
-        { q: "Жарық жылдамдығы вакуумде қаншаға тең?", options: ["300 000 км/с", "150 000 км/с", "300 м/с", "1000 км/с"], answer: 0 },
-        { q: "Шағылысу заңы?", options: ["Түсу бұрышы шағылысу бұрышына тең", "Сыну бұрышы үлкен", "Түсу бұрышы 90 градус", "Сәулелер тоғысады"], answer: 0 },
-        { q: "Жарықтың сыну көрсеткіші?", options: ["n = c/v", "n = v/c", "n = sin(r)/sin(i)", "n = d/f"], answer: 0 },
-        { q: "Жұқа линза формуласы?", options: ["1/F = 1/d + 1/f", "F = d + f", "1/F = 1/d - 1/f", "D = 1/F"], answer: 0 },
-        { q: "Линзаның оптикалық күші?", options: ["Диоптрия (дптр)", "Метр (м)", "Ватт (Вт)", "Люкс (лк)"], answer: 0 },
-        { q: "Дифракция дегеніміз не?", options: ["Жарықтың бөгеттерді орап өтуі", "Жарықтың сынуы", "Жарықтың шағылысуы", "Жарықтың түсі"], answer: 0 },
-        { q: "Жарық дисперсиясы дегеніміз?", options: ["Жарықтың спектрге жіктелуі", "Жарықтың шағылысуы", "Жарықтың жұтылуы", "Жарықтың түзу сызықты қозғалысы"], answer: 0 },
-        { q: "Жақыннан көргіштік кезінде қандай линза қолданылады?", options: ["Шашыратқыш (ойыс)", "Жинағыш (дөңес)", "Цилиндрлік", "Призмалық"], answer: 0 },
-        { q: "Күн сәулесінің жеті түске бөлінуін алғаш зерттеген кім?", options: ["Исаак Ньютон", "Альберт Эйнштейн", "Галилео Галилей", "Макс Планк"], answer: 0 },
-        { q: "Жарықтың толық ішкі шағылысуы қайда қолданылады?", options: ["Талшықты оптикада", "Айнада", "Линзада", "Көзілдірікте"], answer: 0 },
-        { q: "Кемпірқосақ қандай құбылысқа жатады?", options: ["Дисперсия", "Дифракция", "Интерференция", "Поляризация"], answer: 0 },
-        { q: "Көздің торлы қабығында кескін қалай пайда болады?", options: ["Шын, кішірейтілген, төңкерілген", "Жалған, үлкейтілген", "Тура, шын", "Кескін пайда болмайды"], answer: 0 },
-        { q: "Лупа ретінде қандай линза қолданылады?", options: ["Жинағыш линза", "Шашыратқыш линза", "Жай шыны", "Айна"], answer: 0 },
-        { q: "Көлеңке қалай пайда болады?", options: ["Жарықтың түзу сызықты таралуынан", "Жарықтың сынуынан", "Жарықтың жұтылуынан", "Жарықтың шағылысуынан"], answer: 0 },
-        { q: "Интерференция дегеніміз?", options: ["Толқындардың қабаттасуы нәтижесінде күшеюі немесе әлсіреуі", "Сыну", "Шағылысу", "Жұтылу"], answer: 0 },
-        { q: "Жарық кванты қалай аталады?", options: ["Фотон", "Электрон", "Протон", "Нейтрон"], answer: 0 },
-        { q: "Алыстан көргіштік кезінде қандай линза қолданылады?", options: ["Жинағыш", "Шашыратқыш", "Тегіс", "Призма"], answer: 0 },
-        { q: "Жарықтың электромагниттік теориясын жасаған?", options: ["Джеймс Максвелл", "Исаак Ньютон", "Христиан Гюйгенс", "Томас Юнг"], answer: 0 },
-        { q: "Көрінетін жарық спектріндегі ең ұзын толқын?", options: ["Қызыл", "Күлгін", "Жасыл", "Сары"], answer: 0 },
-        { q: "Көрінетін жарық спектріндегі ең қысқа толқын?", options: ["Күлгін", "Қызыл", "Көк", "Сарғылт"], answer: 0 },
-        { q: "Микроскоп не үшін қажет?", options: ["Өте кішкентай нысандарды үлкейтіп көру үшін", "Алысты көру үшін", "Жарықты өлшеу үшін", "Түр түсті ажырату үшін"], answer: 0 },
-        { q: "Телескоптың қызметі?", options: ["Аспан денелерін бақылау", "Кішкентай заттарды көру", "Жарықтың жылдамдығын өлшеу", "Дыбысты есту"], answer: 0 },
-        { q: "Көлеңке мен жартылай көлеңке немен түсіндіріледі?", options: ["Жарықтың түзу сызықты таралуымен", "Дифракциямен", "Дисперсиямен", "Сынумен"], answer: 0 },
-        { q: "Поляризация құбылысы жарықтың қандай толқын екенін дәлелдейді?", options: ["Көлденең", "Бойлық", "Дыбыстық", "Механикалық"], answer: 0 },
-        { q: "Ультракүлгін сәулелердің қасиеті?", options: ["Химиялық белсенділігі жоғары", "Көзге көрінеді", "Жылуды көп бөледі", "Дыбыс шығарады"], answer: 0 },
-        { q: "Инфрақызыл сәулелердің екінші атауы?", options: ["Жылулық сәулелер", "Рентген сәулелері", "Көрінбейтін жарық", "Радиотолқындар"], answer: 0 },
-        { q: "Жарық толқынының жиілігі артқанда толқын ұзындығы?", options: ["Кемиді", "Артады", "Өзгермейді", "Нөлге тең болады"], answer: 0 },
-        { q: "Толқын ұзындығының өлшем бірлігі?", options: ["Метр (м)", "Герц", "Вакуум", "Секунд"], answer: 0 },
-        { q: "Фотоэффект құбылысын түсіндіргені үшін Нобель сыйлығын алған?", options: ["Альберт Эйнштейн", "Нильс Бор", "Макс Планк", "Эрнест Резерфорд"], answer: 0 },
-        { q: "Линзаның фокус аралығының өлшем бірлігі?", options: ["Метр (м)", "Диоптрия", "Ватт", "Джоуль"], answer: 0 }
+      {
+        "q": "Жарық жылдамдығы вакуумде қаншаға тең?",
+        "options": [
+          "300 000 км/с",
+          "150 000 км/с",
+          "300 м/с",
+          "1000 км/с"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Шағылысу заңы?",
+        "options": [
+          "Түсу бұрышы шағылысу бұрышына тең",
+          "Сыну бұрышы үлкен",
+          "Түсу бұрышы 90 градус",
+          "Сәулелер тоғысады"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Жарықтың сыну көрсеткіші?",
+        "options": [
+          "n = c/v",
+          "n = v/c",
+          "n = sin(r)/sin(i)",
+          "n = d/f"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Линзаның оптикалық күші?",
+        "options": [
+          "Диоптрия (дптр)",
+          "Метр (м)",
+          "Ватт (Вт)",
+          "Люкс (лк)"
+        ],
+        "answer": 0
+      }
+    ],
+    "Кванттық физика": [
+      {
+        "q": "Жарық кванты қалай аталады?",
+        "options": [
+          "Фотон",
+          "Электрон",
+          "Протон",
+          "Нейтрон"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Фотоэффект заңын кім ашты?",
+        "options": [
+          "Альберт Эйнштейн",
+          "Нильс Бор",
+          "Макс Планк",
+          "Эрнест Резерфорд"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Атомның планетарлық моделін ұсынған?",
+        "options": [
+          "Эрнест Резерфорд",
+          "Дж. Томсон",
+          "Нильс Бор",
+          "Исаак Ньютон"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Планк тұрақтысының мағынасы?",
+        "options": [
+          "Энергия квантының жиілікке қатынасы",
+          "Жарық жылдамдығы",
+          "Масса",
+          "Күш"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Радиоактивтілік құбылысын ашқан?",
+        "options": [
+          "Анри Беккерель",
+          "Мария Кюри",
+          "Пьер Кюри",
+          "Вильгельм Рентген"
+        ],
+        "answer": 0
+      }
     ]
   },
-  matches: [
-    { term: "Масса", def: "Дененің инерттілігінің өлшемі" },
-    { term: "Жылдамдық", def: "Уақыт бірлігіндегі орын ауыстыру" },
-    { term: "Қысым", def: "Бетке түсетін күштің ауданға қатынасы" },
-    { term: "Кедергі", def: "Өткізгіштің тоққа жасайтын бөгеті" },
-    { term: "Күш", def: "Денелердің өзара әрекеттесу өлшемі" },
-    { term: "Температура", def: "Дененің жылулық күйінің сипаттамасы" }
+  "matches": [
+    {
+      "term": "Масса",
+      "def": "Дененің инерттілігінің өлшемі"
+    },
+    {
+      "term": "Жылдамдық",
+      "def": "Уақыт бірлігіндегі орын ауыстыру"
+    },
+    {
+      "term": "Қысым",
+      "def": "Бетке түсетін күштің ауданға қатынасы"
+    },
+    {
+      "term": "Кедергі",
+      "def": "Өткізгіштің тоққа жасайтын бөгеті"
+    },
+    {
+      "term": "Күш",
+      "def": "Денелерөдің өзара әрекеттесу өлшемі"
+    },
+    {
+      "term": "Температура",
+      "def": "Дененің жылулық күйінің сипаттамасы"
+    }
   ]
 };
 
@@ -577,43 +1103,7 @@ window.handleMatchSelection = function(btn, side) {
   }
 };
 
-function showMyClassGroup() {
-  const content = document.getElementById('teacher-content');
-  const teacherClassesRaw = state.teacherProfile.classes || '';
-  const availableClasses = teacherClassesRaw.split(',').map(c => c.trim());
 
-  content.innerHTML = `
-    <button class="btn-secondary voice-target" onclick="renderTeacherDashboard()" style="margin-bottom: 2rem; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;">
-      <i data-lucide="arrow-left" size="18"></i> Басты бетке қайту
-    </button>
-    
-    <div class="glass-card animate-fade-in" style="padding: 2.5rem;">
-      <div class="flex justify-between items-center" style="margin-bottom: 2.5rem; flex-wrap: wrap; gap: 1.5rem;">
-        <div>
-          <h2 class="voice-target gradient-text" style="font-size: 2.2rem; font-weight: 800; margin-bottom: 0.5rem;">Менің сыныбым</h2>
-          <p style="color: var(--text-secondary);">Оқушылардың жеке мәліметтері мен жалпы үлгерімі</p>
-        </div>
-        <div class="flex items-center gap-4 flex-wrap">
-          <div class="v-center glass-panel" style="padding: 0.5rem 1rem; border-radius: 12px; border: 1px solid var(--border-glass); background: #fff;">
-            <i data-lucide="search" size="18" style="color: var(--text-tertiary); margin-right: 0.5rem;"></i>
-            <input type="text" id="student-search-input" placeholder="Оқушыны іздеу..." style="border: none; outline: none; background: transparent; font-size: 0.95rem; width: 180px;" oninput="filterMyClassGroup()">
-          </div>
-          <select id="my-class-filter" class="glass-panel" style="padding: 0.6rem 1.5rem; border-radius: 12px; outline: none; border: 1px solid var(--border-glass); cursor: pointer;" onchange="filterMyClassGroup()">
-            <option value="all">Барлық сыныптар</option>
-            ${availableClasses.map(c => `<option value="${c}">${c}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-
-      <div class="grid gap-4" id="students-grid" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
-         <!-- Content generated by filterMyClassGroup() -->
-      </div>
-    </div>
-  `;
-  
-  filterMyClassGroup();
-  lucide.createIcons();
-}
 
 function filterMyClassGroup() {
   const filterVal = document.getElementById('my-class-filter').value;
