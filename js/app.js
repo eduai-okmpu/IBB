@@ -415,7 +415,7 @@ const lessonsData = {
 
     title: 'Дененің еркін түсу үдеуі',
     image: 'media/lessons/freefall.png',
-    video: 'https://www.youtube.com/embed/5UaK3fOf-0I',
+    video: 'https://www.youtube.com/embed/Px9Tidqtrw4',
     theory: `<h3>Еркін түсу ұғымы</h3>
              <p><b>Еркін түсу</b> — бұл денелердің тек қана ауырлық күшінің әсерінен қозғалуы. Мұндай қозғалыс кезінде денеге басқа ешқандай күштер (мысалы, ауаның кедергі күші) әсер етпейді деп есептеледі.</p>
              <h4>Негізгі сипаттамалары:</h4>
@@ -479,7 +479,7 @@ const lessonsData = {
   impulse: {
     title: 'Дене импульсі',
     image: 'media/lessons/impulse.png',
-    video: 'https://www.youtube.com/embed/f3pG1iH9Fh0',
+    video: 'https://www.youtube.com/embed/1ZK1KUAdTDw',
     theory: `<h3>Дене импульсі және оның сақталу заңы</h3>
              <p><b>Дене импульсі (қозғалыс мөлшері)</b> — бұл дененің инерттілігі мен қозғалыс жылдамдығын сипаттайтын векторлық физикалық шама.</p>
              <div class="glass-card flex-center" style="padding: 1.5rem; margin: 1rem 0; font-size: 1.8rem; font-weight: 800; color: var(--accent-purple); flex-direction: column; gap: 10px;">
@@ -534,7 +534,7 @@ const lessonsData = {
   current: {
     title: 'Гук заңы',
     image: 'media/lessons/hooke.png',
-    video: 'https://www.youtube.com/embed/5UaK3fOf-0I',
+    video: 'https://www.youtube.com/embed/vx8WrN0wvhE',
     theory: `<h3>Гук заңы және серпімділік күші</h3>
              <p><b>Серпімділік күші</b> — дене деформацияланған кезде пайда болатын және оны бастапқы қалпына келтіруге тырысатын күш.</p>
              <h4>Заңдылық:</h4>
