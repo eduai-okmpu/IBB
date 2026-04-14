@@ -28,8 +28,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transform: translateX(40px);
-            /* Move slightly to the right */
+            margin: 0 auto;
         }
 
         .atom {
@@ -159,12 +158,12 @@
         <div class="transition-circle"></div>
     </div>
     <!-- Accessibility Controls -->
-    <div id="a11y-bar" class="accessibility-bar" role="toolbar" aria-label="Арнайы мүмкіндіктер">
-        <button id="toggle-a11y-menu" class="a11y-btn main-toggle" title="Арнайы мүмкіндіктерді ашу/жабу" aria-label="Арнайы мүмкіндіктерді ашу/жабу">
+    <!-- Accessibility Tools -->
+    <div class="a11y-panel" id="a11y-panel" style="display: none;">
+        <button id="toggle-a11y-menu" class="a11y-btn main-toggle" title="Баптаулар" aria-label="Баптаулар мәзірін ашу">
             <i data-lucide="settings"></i>
         </button>
-        <button id="toggle-tts" class="a11y-btn" title="Дыбыстық сүйемелдеуді қосу"
-            aria-label="Дыбыстық сүйемелдеуді қосу">
+        <button id="toggle-tts" class="a11y-btn" title="Дыбысты қосу/өшіру" aria-label="Дыбысты қосу/өшіру">
             <i data-lucide="volume-2"></i>
         </button>
         <button id="toggle-contrast" class="a11y-btn" title="Жоғары контраст режимі"
@@ -173,17 +172,14 @@
         </button>
         <button id="increase-font" class="a11y-btn" title="Мәтінді үлкейту" aria-label="Мәтінді үлкейту">
             <i data-lucide="type"></i>
-            <span class="size-level">A</span>
+            <span class="size-level"
+                style="font-size: 10px; font-weight: 800; position: absolute; bottom: 8px; right: 8px;">A</span>
         </button>
     </div>
 
-    <header class="container flex justify-between items-center" style="padding: 1.5rem 2rem;">
+    <header class="container flex justify-between items-center" style="padding: 1rem 2rem; min-height: 80px; position: relative; z-index: 100;">
         <div class="flex items-center gap-4">
-            <button id="global-back" class="a11y-btn" style="display: none;" onclick="goBack()" title="Кері қайту"
-                aria-label="Кері қайту">
-                <i data-lucide="arrow-left"></i>
-            </button>
-            <div class="logo flex items-center gap-4 cursor-pointer" onclick="navigate('home')">
+            <div class="logo flex items-center gap-4 cursor-pointer" onclick="navigateHome()">
                 <div
                     style="background: var(--primary-gradient); width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
                     <i data-lucide="atom" style="color: white;"></i>
@@ -194,10 +190,10 @@
         </div>
         <nav class="flex gap-6 items-center">
             <div id="header-actions" class="flex gap-4">
-                <a href="#" onclick="navigate('login')" class="btn-secondary voice-target"
-                    style="padding: 0.6rem 1.2rem;">Кіру</a>
-                <a href="#" onclick="navigate('login')" class="btn-primary voice-target"
-                    style="padding: 0.6rem 1.2rem;">Тіркелу</a>
+                <button onclick="openAuthModal()" class="btn-secondary voice-target"
+                    style="padding: 0.6rem 1.2rem; cursor: pointer; border: 1px solid var(--border-glass);">Кіру</button>
+                <button onclick="openAuthModal('register')" class="btn-primary voice-target"
+                    style="padding: 0.6rem 1.2rem; cursor: pointer;">Тіркелу</button>
             </div>
             <div id="auth-actions" style="display: none; position: relative;">
                 <!-- Notifications removed -->
@@ -220,7 +216,7 @@
                         веб-қосымшасы
                     </p>
                     <div class="flex gap-4">
-                        <button class="btn-primary btn-lg voice-target" onclick="navigate('login')">Бастау</button>
+                        <button class="btn-primary btn-lg voice-target" onclick="navigateHome()">Бастау</button>
                     </div>
                 </div>
                 <div class="flex items-center justify-center">
@@ -288,6 +284,7 @@
                                 <p>Оқу процесіне кедергі келтіретін ешқандай жасырын жарнамалар, қалқымалы терезелер
                                     немесе спам хабарламалар жоқ.</p>
                             </div>
+                            <!-- (rest of cards kept for ticker) -->
                             <div class="news-card">
                                 <div class="news-card-icon"
                                     style="background: linear-gradient(135deg, #D6990022, #D6990044); border-color: #D6990033;">
@@ -297,188 +294,250 @@
                                 <h4>Дыбыстық сүйемелдеу жүйесі</h4>
                                 <p>Сайттағы барлық мәтіндер, тапсырмалар мен түсіндірмелер автоматты түрде дауыстап
                                     оқылады (Text-to-Speech).</p>
-                            </div>
-                            <div class="news-card">
-                                <div class="news-card-icon"
-                                    style="background: linear-gradient(135deg, #805AD522, #805AD544); border-color: #805AD533;">
-                                    <i data-lucide="mouse-pointer-click" style="color:#805AD5;"></i>
-                                </div>
-                                <span class="news-card-tag">Ыңғайлылық</span>
-                                <h4>Қолдануға өте оңай интерфейс</h4>
-                                <p>Беттегі барлық элементтер түсінікті орналасқан, артық түймелер жоқ. Балалар сайтты
-                                    интуитивті түрде меңгере алады.</p>
-                            </div>
-                            <div class="news-card">
-                                <div class="news-card-icon"
-                                    style="background: linear-gradient(135deg, #3182CE22, #3182CE44); border-color: #3182CE33;">
-                                    <i data-lucide="flask-conical" style="color:#3182CE;"></i>
-                                </div>
-                                <span class="news-card-tag">Интерактивтілік</span>
-                                <h4>Көрнекі виртуалды зертханалар</h4>
-                                <p>Құрғақ мәтіннің орнына қолмен басқаруға болатын, нақты физикалық заңдылықтарға
-                                    негізделген анимациялық зертханалар.</p>
-                            </div>
-                            <div class="news-card">
-                                <div class="news-card-icon"
-                                    style="background: linear-gradient(135deg, #E53E3E22, #E53E3E44); border-color: #E53E3E33;">
-                                    <i data-lucide="bot" style="color:#E53E3E;"></i>
-                                </div>
-                                <span class="news-card-tag">Технология</span>
-                                <h4>Жасанды интеллект көмекшісі</h4>
-                                <p>Оқушылар кез келген уақытта физика бойынша туындаған сұрақтарын AI көмекшіге қойып,
-                                    жауап ала алады.</p>
-                            </div>
-                            <div class="news-card">
-                                <div class="news-card-icon"
-                                    style="background: linear-gradient(135deg, #38A16922, #38A16944); border-color: #38A16933;">
-                                    <i data-lucide="layout-dashboard" style="color:#38A169;"></i>
-                                </div>
-                                <span class="news-card-tag">Басқару</span>
-                                <h4>Мұғалімдерге арналған толық бақылау</h4>
-                                <p>Ұстаздар жеке кабинет арқылы өз сыныбын тіркей алады, олардың үлгерімін және тапсырма
-                                    нәтижелерін бақылайды.</p>
-                            </div>
-                            <!-- Duplicate Set for infinite scroll -->
-                            <div class="news-card">
-                                <div class="news-card-icon"
-                                    style="background: linear-gradient(135deg, #3182CE22, #3182CE44); border-color: #3182CE33;">
-                                    <i data-lucide="eye" style="color:#3182CE;"></i>
-                                </div>
-                                <span class="news-card-tag">Инклюзивтілік</span>
-                                <h4>ЕББҚ ететін балаларға арналған</h4>
-                                <p>Платформа көру қабілеті шектеулі балаларға толық бейімделген, жоғары контраст пен
-                                    үлкейтілген қаріптер қолданылады.</p>
-                            </div>
-                            <div class="news-card">
-                                <div class="news-card-icon"
-                                    style="background: linear-gradient(135deg, #38A16922, #38A16944); border-color: #38A16933;">
-                                    <i data-lucide="shield-check" style="color:#38A169;"></i>
-                                </div>
-                                <span class="news-card-tag">Қауіпсіздік</span>
-                                <h4>100% Вируссыз және қауіпсіз орта</h4>
-                                <p>Сайт зиянды бағдарламалардан толықтай қорғалған, балалардың жеке деректері қатаң
-                                    сақталып, сыртқа таралмайды.</p>
-                            </div>
-                            <div class="news-card">
-                                <div class="news-card-icon"
-                                    style="background: linear-gradient(135deg, #E53E3E22, #E53E3E44); border-color: #E53E3E33;">
-                                    <i data-lucide="ban" style="color:#E53E3E;"></i>
-                                </div>
-                                <span class="news-card-tag">Жарнамасыз</span>
-                                <h4>Ешқандай жарнама жоқ</h4>
-                                <p>Оқу процесіне кедергі келтіретін ешқандай жасырын жарнамалар, қалқымалы терезелер
-                                    немесе спам хабарламалар жоқ.</p>
-                            </div>
-                            <div class="news-card">
-                                <div class="news-card-icon"
-                                    style="background: linear-gradient(135deg, #D6990022, #D6990044); border-color: #D6990033;">
-                                    <i data-lucide="volume-2" style="color:#D69900;"></i>
-                                </div>
-                                <span class="news-card-tag">Қолжетімділік</span>
-                                <h4>Дыбыстық сүйемелдеу жүйесі</h4>
-                                <p>Сайттағы барлық мәтіндер, тапсырмалар мен түсіндірмелер автоматты түрде дауыстап
-                                    оқылады (Text-to-Speech).</p>
-                            </div>
-                            <div class="news-card">
-                                <div class="news-card-icon"
-                                    style="background: linear-gradient(135deg, #805AD522, #805AD544); border-color: #805AD533;">
-                                    <i data-lucide="mouse-pointer-click" style="color:#805AD5;"></i>
-                                </div>
-                                <span class="news-card-tag">Ыңғайлылық</span>
-                                <h4>Қолдануға өте оңай интерфейс</h4>
-                                <p>Беттегі барлық элементтер түсінікті орналасқан, артық түймелер жоқ. Балалар сайтты
-                                    интуитивті түрде меңгере алады.</p>
-                            </div>
-                            <div class="news-card">
-                                <div class="news-card-icon"
-                                    style="background: linear-gradient(135deg, #3182CE22, #3182CE44); border-color: #3182CE33;">
-                                    <i data-lucide="flask-conical" style="color:#3182CE;"></i>
-                                </div>
-                                <span class="news-card-tag">Интерактивтілік</span>
-                                <h4>Көрнекі виртуалды зертханалар</h4>
-                                <p>Құрғақ мәтіннің орнына қолмен басқаруға болатын, нақты физикалық заңдылықтарға
-                                    негізделген анимациялық зертханалар.</p>
-                            </div>
-                            <div class="news-card">
-                                <div class="news-card-icon"
-                                    style="background: linear-gradient(135deg, #E53E3E22, #E53E3E44); border-color: #E53E3E33;">
-                                    <i data-lucide="bot" style="color:#E53E3E;"></i>
-                                </div>
-                                <span class="news-card-tag">Технология</span>
-                                <h4>Жасанды интеллект көмекшісі</h4>
-                                <p>Оқушылар кез келген уақытта физика бойынша туындаған сұрақтарын AI көмекшіге қойып,
-                                    жауап ала алады.</p>
-                            </div>
-                            <div class="news-card">
-                                <div class="news-card-icon"
-                                    style="background: linear-gradient(135deg, #38A16922, #38A16944); border-color: #38A16933;">
-                                    <i data-lucide="layout-dashboard" style="color:#38A169;"></i>
-                                </div>
-                                <span class="news-card-tag">Басқару</span>
-                                <h4>Мұғалімдерге арналған толық бақылау</h4>
-                                <p>Ұстаздар жеке кабинет арқылы өз сыныбын тіркей алады, олардың үлгерімін және тапсырма
-                                    нәтижелерін бақылайды.</p>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <!-- === END NEWS SECTION === -->
 
-        </section>
-
-        <!-- Login View -->
-        <section id="login-view" class="view container">
-            <div class="flex flex-col items-center justify-center" style="min-height: 60vh;">
-                <h2 style="font-size: 2.5rem; margin-bottom: 2rem;" class="voice-target">Платформаға кіру</h2>
-                <div class="grid gap-8"
-                    style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); width: 100%; max-width: 800px;">
-                    <div class="glass-card flex flex-col items-center gap-4 voice-target" onclick="login('teacher')">
-                        <i data-lucide="graduation-cap" size="48" style="color: var(--accent-purple);"></i>
-                        <h3 style="font-size: 1.5rem;">Мен Мұғаліммін</h3>
-                        <p style="text-align: center; color: var(--text-secondary);">Сабақ жоспарларын жасау және
-                            оқушылардың үлгерімін бақылау.</p>
-                        <button class="btn-primary" style="width: 100%;">Кіру</button>
-                    </div>
-                    <div class="glass-card flex flex-col items-center gap-4 voice-target" onclick="login('student')">
-                        <i data-lucide="user" size="48" style="color: var(--accent-orange);"></i>
-                        <h3 style="font-size: 1.5rem;">Мен Оқушымын</h3>
-                        <p style="text-align: center; color: var(--text-secondary);">Интерактивті сабақтар мен ойындар
-                            арқылы физиканы үйрену.</p>
-                        <button class="btn-primary" style="width: 100%;">Кіру</button>
+            <!-- === HOW IT WORKS === -->
+            <div
+                style="padding: 6rem 0; background: rgba(255,255,255,0.3); border-radius: 60px 60px 0 0; margin-top: 4rem;">
+                <div class="container">
+                    <h2 class="heading-page text-center" style="margin-bottom: 4rem;">Платформа қалай жұмыс істейді?
+                    </h2>
+                    <div class="grid" style="grid-template-columns: repeat(3, 1fr); gap: 2.5rem;">
+                        <div class="glass-card animate-fade-in" style="text-align: center; padding: 3rem 2rem;">
+                            <div class="flex-center"
+                                style="width: 70px; height: 70px; background: var(--secondary-gradient); border-radius: 50%; margin: 0 auto 1.5rem; color: var(--accent-orange); font-size: 1.5rem; font-weight: 800;">
+                                1</div>
+                            <h3 style="margin-bottom: 1rem;">Тіркелу</h3>
+                            <p style="color: var(--text-secondary);">Мұғалім немесе оқушы ретінде тіркеліп, өзіңіздің
+                                жеке кабинетіңізге кіріңіз.</p>
+                        </div>
+                        <div class="glass-card animate-fade-in"
+                            style="text-align: center; padding: 3rem 2rem; animation-delay: 0.2s;">
+                            <div class="flex-center"
+                                style="width: 70px; height: 70px; background: var(--secondary-gradient); border-radius: 50%; margin: 0 auto 1.5rem; color: var(--accent-orange); font-size: 1.5rem; font-weight: 800;">
+                                2</div>
+                            <h3 style="margin-bottom: 1rem;">Мазмұнды таңдау</h3>
+                            <p style="color: var(--text-secondary);">Интерактивті сабақтарды, виртуалды зертханаларды
+                                немесе AI көмекшісін пайдаланыңыз.</p>
+                        </div>
+                        <div class="glass-card animate-fade-in"
+                            style="text-align: center; padding: 3rem 2rem; animation-delay: 0.4s;">
+                            <div class="flex-center"
+                                style="width: 70px; height: 70px; background: var(--secondary-gradient); border-radius: 50%; margin: 0 auto 1.5rem; color: var(--accent-orange); font-size: 1.5rem; font-weight: 800;">
+                                3</div>
+                            <h3 style="margin-bottom: 1rem;">Нәтижеге қол жеткізу</h3>
+                            <p style="color: var(--text-secondary);">Тапсырмаларды орындап, біліміңізді тексеріңіз және
+                                жетістіктеріңізді бақылаңыз.</p>
+                        </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- === STATS SECTION === -->
+            <div style="background: var(--primary-gradient); padding: 5rem 0; color: white;">
+                <div class="container grid"
+                    style="grid-template-columns: repeat(4, 1fr); text-align: center; gap: 2rem;">
+                    <div>
+                        <div style="font-size: 3.5rem; font-weight: 800; line-height: 1;">500+</div>
+                        <p style="opacity: 0.8; margin-top: 0.5rem;">Белсенді оқушылар</p>
+                    </div>
+                    <div>
+                        <div style="font-size: 3.5rem; font-weight: 800; line-height: 1;">100+</div>
+                        <p style="opacity: 0.8; margin-top: 0.5rem;">Интерактивті сабақтар</p>
+                    </div>
+                    <div>
+                        <div style="font-size: 3.5rem; font-weight: 800; line-height: 1;">50+</div>
+                        <p style="opacity: 0.8; margin-top: 0.5rem;">Виртуалды тәжірибелер</p>
+                    </div>
+                    <div>
+                        <div style="font-size: 3.5rem; font-weight: 800; line-height: 1;">100%</div>
+                        <p style="opacity: 0.8; margin-top: 0.5rem;">Қолжетімді мазмұн</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- === CALL TO ACTION === -->
+            <div class="container" style="padding: 8rem 2rem; text-align: center;">
+                <h2 style="font-size: 2.8rem; margin-bottom: 1.5rem;">Физика әлемін бізбен бірге ашыңыз</h2>
+                <p
+                    style="font-size: 1.2rem; color: var(--text-secondary); margin-bottom: 3rem; max-width: 600px; margin-left: auto; margin-right: auto;">
+                    Инклюзивті білім беру платформасына қосылып, физиканы қызықты әрі оңай үйреніңіз.
+                </p>
+                <button class="btn-primary btn-lg" onclick="openAuthModal()"
+                    style="padding: 1.2rem 3rem; font-size: 1.2rem;">Қазір бастау</button>
             </div>
         </section>
 
         <!-- Dynamic Views (Teacher/Student/Labs) will be injected here or toggled -->
-        <section id="teacher-view" class="view container">
-            <!-- Content in next steps -->
-        </section>
-
-        <section id="teacher-class-view" class="view container">
-            <!-- Content in next steps -->
-        </section>
-
-        <section id="teacher-ai-view" class="view container">
-            <!-- Content in next steps -->
-        </section>
-
-        <section id="student-view" class="view container">
-            <!-- Content in next steps -->
-        </section>
-
-        <section id="labs-view" class="view container">
-            <!-- Content in next steps -->
-        </section>
+        <section id="teacher-view" class="view container"></section>
+        <section id="teacher-class-view" class="view container"></section>
+        <section id="teacher-ai-view" class="view container"></section>
+        <section id="student-view" class="view container"></section>
+        <section id="student-ai-view" class="view container"></section>
+        <section id="student-lessons-view" class="view container"></section>
+        <section id="labs-view" class="view container"></section>
 
     </main>
 
-    <footer class="container" style="padding: 4rem 2rem; border-top: 1px solid var(--border-glass); margin-top: 4rem;">
-        <div class="flex justify-between items-center">
-            <p style="color: var(--text-secondary);">&copy; 2026 PhysicsAccess. Барлық құқықтар қорғалған.</p>
+    <footer class="container"
+        style="padding: 6rem 2rem 4rem; border-top: 1px solid var(--border-glass); margin-top: 4rem;">
+        <div class="grid" style="grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 4rem; margin-bottom: 4rem;">
+            <div>
+                <div class="logo flex items-center gap-4 mb-6">
+                    <div
+                        style="background: var(--primary-gradient); width: 32px; height: 32px; border-radius: 6px; flex-center">
+                        <i data-lucide="atom" style="color: white; width: 18px;"></i>
+                    </div>
+                    <h3 style="font-weight: 700;">PhysicsAccess</h3>
+                </div>
+                <p style="color: var(--text-secondary); line-height: 1.6;">Инклюзивті білім беру арқылы әрбір оқушының
+                    физикаға деген қызығушылығын оятып, тең мүмкіндіктер жасау – біздің басты мақсатымыз.</p>
+            </div>
+            <div>
+                <h4 style="margin-bottom: 1.5rem;">Бөлімдер</h4>
+                <div class="flex flex-col gap-3">
+                    <a href="#" onclick="navigateHome()"
+                        style="color: var(--text-secondary); text-decoration: none;">Басты бет</a>
+                    <a href="#" onclick="navigate('labs')"
+                        style="color: var(--text-secondary); text-decoration: none;">Зертхана</a>
+                    <a href="#" onclick="openAuthModal()"
+                        style="color: var(--text-secondary); text-decoration: none;">Кіру</a>
+                </div>
+            </div>
+            <div>
+                <h4 style="margin-bottom: 1.5rem;">Қолдау</h4>
+                <div class="flex flex-col gap-3">
+                    <a href="#" style="color: var(--text-secondary); text-decoration: none;">Жиі қойылатын сұрақтар</a>
+                    <a href="#" style="color: var(--text-secondary); text-decoration: none;">Пайдалану шарттары</a>
+                    <a href="#" style="color: var(--text-secondary); text-decoration: none;">Құпиялылық саясаты</a>
+                </div>
+            </div>
+            <div>
+                <h4 style="margin-bottom: 1.5rem;">Байланыс</h4>
+                <div class="flex flex-col gap-3">
+                    <p style="color: var(--text-secondary);"><i data-lucide="mail" size="16"
+                            style="margin-right: 8px;"></i> info@physicsaccess.kz</p>
+                    <p style="color: var(--text-secondary);"><i data-lucide="phone" size="16"
+                            style="margin-right: 8px;"></i> +7 (777) 123 45 67</p>
+                </div>
+            </div>
+        </div>
+        <div class="flex justify-between items-center"
+            style="padding-top: 3rem; border-top: 1px solid var(--border-glass);">
+            <p style="color: var(--text-tertiary); font-size: 0.9rem;">&copy; 2026 PhysicsAccess. Барлық құқықтар
+                қорғалған.</p>
+            <div class="flex gap-4">
+                <a href="#" style="color: var(--text-tertiary);"><i data-lucide="instagram" size="20"></i></a>
+                <a href="#" style="color: var(--text-tertiary);"><i data-lucide="facebook" size="20"></i></a>
+                <a href="#" style="color: var(--text-tertiary);"><i data-lucide="youtube" size="20"></i></a>
+            </div>
         </div>
     </footer>
+
+    <div id="auth-modal" class="calc-backdrop" style="display: none;"
+        onclick="if(event.target === this) closeAuthModal()">
+        <div class="animate-scale-in"
+            style="width: 100%; max-width: 400px; padding: 2.5rem; position: relative; background: #ffffff; border-radius: 32px; box-shadow: 0 25px 50px rgba(0,0,0,0.2);">
+            <button onclick="closeAuthModal()"
+                style="position: absolute; top: 1.2rem; right: 1.2rem; background: none; border: none; cursor: pointer; color: var(--text-tertiary);"><i
+                    data-lucide="x"></i></button>
+
+            <div id="auth-loading"
+                style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 10; border-radius: 32px; align-items: center; justify-content: center; flex-direction: column;">
+                <div class="animate-spin"
+                    style="width: 40px; height: 40px; border: 4px solid var(--accent-orange); border-top-color: transparent; border-radius: 50%; margin-bottom: 1rem;">
+                </div>
+                <p style="font-weight: 700;">Өңделуде...</p>
+            </div>
+
+            <!-- Login View -->
+            <div id="login-form-view">
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <h2 style="font-size: 1.8rem; margin-bottom: 0.5rem;">Қош келдіңіз!</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Платформаға кіру үшін мәліметтерді
+                        енгізіңіз</p>
+                </div>
+
+                <div class="flex flex-col gap-4">
+                    <div class="flex flex-col gap-2">
+                        <label class="label-caps" style="font-size: 0.7rem;">Логин (Email)</label>
+                        <input type="email" id="login-email"
+                            style="padding: 0.9rem; border-radius: 12px; background: #f8fafc; border: 1.5px solid #e2e8f0; outline: none; font-size: 0.95rem;"
+                            placeholder="example@mail.com">
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="label-caps" style="font-size: 0.7rem;">Құпия сөз</label>
+                        <input type="password" id="login-password"
+                            style="padding: 0.9rem; border-radius: 12px; background: #f8fafc; border: 1.5px solid #e2e8f0; outline: none; font-size: 0.95rem;"
+                            placeholder="••••••••">
+                    </div>
+
+                    <div style="margin-top: 0.5rem;">
+                        <button class="btn-primary"
+                            style="width: 100%; padding: 1rem; font-size: 1rem; border-radius: 12px;"
+                            onclick="handleAuthSubmit('login')">Жүйеге кіру</button>
+                    </div>
+
+                    <p style="text-align: center; font-size: 0.9rem; color: var(--text-secondary); margin-top: 1rem;">
+                        Аккаунтыңыз жоқ па? <a href="#" onclick="toggleAuthMode('register')"
+                            style="color: var(--accent-orange); font-weight: 700; text-decoration: none;">Тіркелу</a>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Register View -->
+            <div id="register-form-view" style="display: none;">
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <h2 style="font-size: 1.8rem; margin-bottom: 0.5rem;">Тіркелу</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Жаңа аккаунт жасау</p>
+                </div>
+
+                <div class="flex flex-col gap-4">
+                    <div class="flex flex-col gap-2">
+                        <label class="label-caps" style="font-size: 0.7rem;">Аты-жөніңіз</label>
+                        <input type="text" id="reg-name"
+                            style="padding: 0.9rem; border-radius: 12px; background: #f8fafc; border: 1.5px solid #e2e8f0; outline: none; font-size: 0.95rem;"
+                            placeholder="Атыңызды енгізіңіз">
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="label-caps" style="font-size: 0.7rem;">Мәртебеңіз</label>
+                        <select id="reg-role"
+                            style="padding: 0.9rem; border-radius: 12px; background: #f8fafc; border: 1.5px solid #e2e8f0; outline: none; font-size: 0.95rem; cursor: pointer;">
+                            <option value="student">Оқушы</option>
+                            <option value="teacher">Мұғалім</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="label-caps" style="font-size: 0.7rem;">Email</label>
+                        <input type="email" id="reg-email"
+                            style="padding: 0.9rem; border-radius: 12px; background: #f8fafc; border: 1.5px solid #e2e8f0; outline: none; font-size: 0.95rem;"
+                            placeholder="example@mail.com">
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="label-caps" style="font-size: 0.7rem;">Құпия сөз</label>
+                        <input type="password" id="reg-password"
+                            style="padding: 0.9rem; border-radius: 12px; background: #f8fafc; border: 1.5px solid #e2e8f0; outline: none; font-size: 0.95rem;"
+                            placeholder="••••••••">
+                    </div>
+
+                    <div style="margin-top: 0.5rem;">
+                        <button class="btn-primary"
+                            style="width: 100%; padding: 1rem; font-size: 1rem; border-radius: 12px;"
+                            onclick="handleAuthSubmit('register')">Тіркелу</button>
+                    </div>
+
+                    <p style="text-align: center; font-size: 0.9rem; color: var(--text-secondary); margin-top: 1rem;">
+                        Аккаунтыңыз бар ма? <a href="#" onclick="toggleAuthMode('login')"
+                            style="color: var(--accent-orange); font-weight: 700; text-decoration: none;">Кіру</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Calculator Modal -->
     <div id="calc-modal" class="calc-backdrop" style="display: none;"
@@ -523,6 +582,7 @@
     <script src="js/teacher.js"></script>
     <script src="js/student.js"></script>
     <script src="js/labs.js"></script>
+    <script src="js/books.js"></script>
     <script>
         // Init Lucide Icons
         lucide.createIcons();

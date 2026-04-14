@@ -1,3 +1,4 @@
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbzsHO8t7TM04Sohp6Lq6nuYzLoSvJOHy_fI4MA0wW7qv6tUxUkwpzUHXVpcmrNMtc_zfg/exec"; // Бұл сілтемені өзіңіздің Google Apps Script web app URL-ге ауыстырыңыз
 const defaultState = {
   view: 'home',
   user: null, // 'teacher' or 'student' or null
@@ -46,7 +47,8 @@ const defaultState = {
 
 const savedState = localStorage.getItem('physicsAccessState');
 const parsedState = savedState ? JSON.parse(savedState) : {};
-const state = { ...defaultState, ...parsedState };
+// Site should start as guest on first launch, so we ignore user/view from storage
+const state = { ...defaultState, ...parsedState, user: null, view: 'home' };
 
 function saveState() {
   localStorage.setItem('physicsAccessState', JSON.stringify({
@@ -81,6 +83,11 @@ window.addEventListener('storage', (e) => {
 });
 
 function navigate(viewId, pushToHistory = true) {
+  // If user is logged in and trying to go to home/login, redirect to dashboard
+  if (state.user && (viewId === 'home' || viewId === 'login')) {
+    viewId = state.user;
+  }
+
   if (pushToHistory && state.view !== viewId) {
     state.history.push(viewId);
   }
@@ -92,18 +99,19 @@ function navigate(viewId, pushToHistory = true) {
 
   const targetView = document.getElementById(`${viewId}-view`);
 
-  const backBtn = document.getElementById('global-back');
-  if (backBtn) backBtn.style.display = state.history.length > 1 ? 'flex' : 'none';
+  const isHome = viewId === 'home' || viewId === 'login';
 
   const headerActions = document.getElementById('header-actions');
   const authActions = document.getElementById('auth-actions');
 
-  if (state.user && (viewId === 'teacher' || viewId === 'student' || viewId === 'teacher-class' || viewId === 'teacher-ai')) {
+  if (state.user) {
     if (headerActions) headerActions.style.display = 'none';
-    if (authActions) authActions.style.display = 'block';
-
+    if (authActions) {
+      authActions.style.display = 'flex';
+      updateHeaderNav();
+    }
   } else {
-    if (headerActions) headerActions.style.display = (viewId === 'home' || viewId === 'login') ? 'flex' : 'none';
+    if (headerActions) headerActions.style.display = isHome ? 'flex' : 'none';
     if (authActions) authActions.style.display = 'none';
   }
 
@@ -112,6 +120,8 @@ function navigate(viewId, pushToHistory = true) {
     if (viewId === 'labs') renderLabs();
     if (viewId === 'teacher' && state.user === 'teacher') window.renderTeacherDashboard();
     if (viewId === 'student' && state.user === 'student') renderStudentDashboard();
+    if (viewId === 'student-lessons' && state.user === 'student') window.showStudentLessons('student-lessons-view', "navigate('student')");
+    if (viewId === 'student-ai' && state.user === 'student') window.showStudentAIAssistant();
     if (viewId === 'teacher-class' && state.user === 'teacher') window.showClassManager();
     if (viewId === 'teacher-ai' && state.user === 'teacher') window.showAIAssistant();
   }
@@ -121,13 +131,55 @@ function navigate(viewId, pushToHistory = true) {
   if (calcBtn) {
     calcBtn.style.display = (viewId === 'lesson') ? 'flex' : 'none';
   }
-  
+
+  // Handle accessibility panel visibility
+  const a11yPanel = document.getElementById('a11y-panel');
+  if (a11yPanel) {
+    const isStudentView = viewId.startsWith('student') || (state.user === 'student' && viewId === 'labs');
+    a11yPanel.style.display = (state.user === 'student' && isStudentView) ? 'flex' : 'none';
+  }
+
   // Close calculator modal if navigating away
   const calcModal = document.getElementById('calc-modal');
   if (calcModal && viewId !== 'lesson') {
     calcModal.style.display = 'none';
   }
 }
+
+function updateHeaderNav() {
+  const authActions = document.getElementById('auth-actions');
+  if (!authActions || !state.user) return;
+
+  const isTeacher = state.user === 'teacher';
+  const navLinks = isTeacher ? [
+    { id: 'teacher', label: 'Басты бет', icon: 'layout' },
+    { id: 'teacher-class', label: 'Сыныптар', icon: 'users' },
+    { id: 'teacher-ai', label: 'AI Көмекші', icon: 'bot' },
+    { id: 'labs', label: 'Зертхана', icon: 'flask-conical' }
+  ] : [
+    { id: 'student', label: 'Басты бет', icon: 'layout' },
+    { id: 'student-lessons', label: 'Сабақтар', icon: 'play-circle' },
+    { id: 'labs', label: 'Зертхана', icon: 'flask-conical' },
+    { id: 'student-ai', label: 'AI Көмекші', icon: 'sparkles' }
+  ];
+
+  authActions.innerHTML = `
+    <div class="flex items-center gap-2 header-nav">
+      ${navLinks.map(link => `
+        <button onclick="${link.fn ? link.fn : `navigate('${link.id}')`}" class="header-nav-btn ${state.view === link.id ? 'active' : ''}">
+          <i data-lucide="${link.icon}" size="18"></i>
+          <span>${link.label}</span>
+        </button>
+      `).join('')}
+      <div style="width: 1px; height: 24px; background: var(--border-glass); margin: 0 0.5rem;"></div>
+      <button onclick="logout()" class="header-nav-btn logout" title="Шығу">
+        <i data-lucide="log-out" size="18"></i>
+      </button>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+}
+
 
 let quizState = {
   topicId: null,
@@ -144,6 +196,89 @@ function goBack() {
   }
 }
 
+const GOOGLE_SCRIPTS_AUTH_URL = 'https://script.google.com/macros/s/AKfycbzsHO8t7TM04Sohp6Lq6nuYzLoSvJOHy_fI4MA0wW7qv6tUxUkwpzUHXVpcmrNMtc_zfg/exec';
+
+window.openAuthModal = function (mode = 'login') {
+  const modal = document.getElementById('auth-modal');
+  if (modal) {
+    modal.style.display = 'flex';
+    toggleAuthMode(mode);
+  }
+};
+
+window.closeAuthModal = function () {
+  const modal = document.getElementById('auth-modal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.toggleAuthMode = function (mode) {
+  const loginView = document.getElementById('login-form-view');
+  const registerView = document.getElementById('register-form-view');
+  if (loginView && registerView) {
+    loginView.style.display = mode === 'login' ? 'block' : 'none';
+    registerView.style.display = mode === 'register' ? 'block' : 'none';
+  }
+};
+
+window.handleAuthSubmit = async function (mode) {
+  const loading = document.getElementById('auth-loading');
+  let params = new URLSearchParams({ action: mode });
+
+  if (mode === 'login') {
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    if (!email || !password) return alert('Мәліметтерді толтырыңыз');
+    params.append('email', email);
+    params.append('password', password);
+  } else {
+    const name = document.getElementById('reg-name').value;
+    const role = document.getElementById('reg-role').value;
+    const email = document.getElementById('reg-email').value;
+    const password = document.getElementById('reg-password').value;
+    if (!name || !email || !password) return alert('Барлық өрістерді толтырыңыз');
+    params.append('name', name);
+    params.append('role', role);
+    params.append('email', email);
+    params.append('password', password);
+  }
+
+  if (loading) loading.style.display = 'flex';
+
+  try {
+    const url = `${GOOGLE_SCRIPTS_AUTH_URL}?${params.toString()}`;
+    const response = await fetch(url);
+    const result = await response.json();
+
+    if (result.success) {
+      state.user = result.user.role;
+      // Set name from result, or fallback to email prefix if "Вы" or empty
+      let name = result.user.name;
+      if (!name || name === 'Вы') {
+        const emailInput = mode === 'login' ? document.getElementById('login-email') : document.getElementById('reg-email');
+        name = (emailInput && emailInput.value) ? emailInput.value.split('@')[0] : 'User';
+      }
+      state.studentProfile.name = name;
+      state.teacherProfile.name = name;
+
+      login(result.user.role);
+      closeAuthModal();
+    } else {
+      alert(result.message || 'Қате орын алды');
+    }
+  } catch (error) {
+    console.error('Auth Error:', error);
+    // FALLBACK for development if API is not yet published correctly
+    const emailField = mode === 'login' ? 'login-email' : 'reg-email';
+    const emailVal = document.getElementById(emailField).value;
+
+    if (emailVal === 'teacher@demo.com') login('teacher');
+    else if (emailVal === 'student@demo.com') login('student');
+    else alert('API байланыс қатесі. Скриптті ДЕПЛОЙ жасап, "Anyone" рұқсатын бергеніңізді тексеріңіз.');
+  } finally {
+    if (loading) loading.style.display = 'none';
+  }
+};
+
 function login(role) {
   state.user = role;
   state.history = ['home', role]; // Set baseline history
@@ -156,6 +291,19 @@ function logout() {
   state.history = ['home'];
   saveState();
   navigate('home', false);
+}
+
+function navigateHome() {
+  if (state.user) {
+    navigate(state.user);
+  } else {
+    // If guest clicks start/logo, show auth modal for better UX
+    if (state.view === 'home') {
+      openAuthModal('register');
+    } else {
+      navigate('home');
+    }
+  }
 }
 
 function renderLabs(category = null) {
@@ -276,7 +424,7 @@ function renderPhetLabsList() {
 function showPhysicsAccessLab(type) {
   const container = document.getElementById('labs-view');
   if (!container) return;
-  
+
   if (type === 'freefall') {
     container.innerHTML = `
       <button class="btn-secondary v-center" style="margin-bottom: 1.5rem; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="renderPhysicsAccessLabs()">
@@ -371,7 +519,7 @@ function renderStudentDashboard() {
             </div>
             <h3 class="label-caps" style="color: var(--text-primary);">AI Көмекші</h3>
             <p style="color: var(--text-secondary); font-size: var(--font-xs); line-height: 1.4;">Физика пәні бойынша кез келген сұрақтарыңа жауап ал.</p>
-            <button class="card-btn orange label-caps" onclick="showStudentAIAssistant()">КІРУ</button>
+            <button class="card-btn orange label-caps" onclick="navigate('student-ai')">КІРУ</button>
           </div>
 
           <!-- Card 2: Lessons -->
@@ -381,7 +529,7 @@ function renderStudentDashboard() {
             </div>
             <h3 class="label-caps" style="color: var(--text-primary);">Сабақтар</h3>
             <p style="color: var(--text-secondary); font-size: var(--font-xs); line-height: 1.4;">Интерактивті сабақтар мен теориялық материалдар.</p>
-            <button class="card-btn orange label-caps" onclick="showStudentLessons()">КІРУ</button>
+            <button class="card-btn orange label-caps" onclick="navigate('student-lessons')">КІРУ</button>
           </div>
 
           <!-- Card 4: Electronic Textbooks -->
@@ -584,16 +732,13 @@ const lessonsData = {
   }
 };
 
-window.showStudentLessons = function(containerId = 'student-content', backFnName = 'renderStudentDashboard') {
+window.showStudentLessons = function (containerId = 'student-content', backFnName = 'renderStudentDashboard') {
   const view = document.getElementById(containerId) || document.getElementById('student-view');
   if (!view) return;
 
   view.innerHTML = `
     <div class="glass-panel animate-fade-in" style="padding: 2.5rem; min-height: 80vh;">
       <div class="flex items-center gap-4" style="margin-bottom: 3rem;">
-        <button class="btn-secondary v-center h-center" style="width: 50px; height: 50px; border-radius: 50%; padding: 0; border: 1.5px solid var(--border-glass);" onclick="${backFnName}()">
-          <i data-lucide="arrow-left" size="24"></i>
-        </button>
         <div>
           <h2 class="gradient-text" style="font-size: 2.5rem; font-weight: 800;">Физика сабақтары</h2>
           <p style="color: var(--text-secondary); font-size: 1.1rem; font-weight: 600;">Өзіңе қажетті тақырыпты таңдап, оқуды баста!</p>
@@ -1603,7 +1748,7 @@ function updateImpulseSim() {
   `;
 }
 
-window.startImpulseAnim = function() {
+window.startImpulseAnim = function () {
   const btn = document.getElementById('start-imp-btn');
   const m1 = parseFloat(document.getElementById('m1-range').value);
   const v1 = parseFloat(document.getElementById('v1-range').value);
@@ -1809,31 +1954,31 @@ function updateHookeValues(prop, val) {
   hookeLabState.isSolvedX = false;
   hookeLabState.feedbackF = '';
   hookeLabState.feedbackX = '';
-  
+
   // Partial update UI for smoothness
   const massVal = document.getElementById('hooke-mass-val');
   const kVal = document.getElementById('hooke-k-val');
   const calcMass = document.getElementById('hooke-calc-mass');
   const feedbackF = document.getElementById('hooke-feedback-f');
   const feedbackX = document.getElementById('hooke-feedback-x');
-  
+
   if (massVal) massVal.innerText = `${hookeLabState.mass} кг`;
   if (kVal) kVal.innerText = `${hookeLabState.k} Н/м`;
   if (calcMass) calcMass.innerText = `${hookeLabState.mass} кг`;
   if (feedbackF) feedbackF.innerHTML = '';
   if (feedbackX) feedbackX.innerHTML = '';
-  
+
   // Reset inputs and buttons
   const inputF = document.getElementById('hooke-calc-f');
   const inputX = document.getElementById('hooke-calc-x');
   const btnF = document.querySelector('[onclick="checkHookeCalculation(\'F\')"]');
   const btnX = document.querySelector('[onclick="checkHookeCalculation(\'X\')"]');
-  
+
   if (inputF) { inputF.disabled = false; inputF.value = ''; }
   if (inputX) { inputX.disabled = false; inputX.value = ''; }
   if (btnF) { btnF.disabled = false; btnF.innerText = 'ТЕКСЕРУ'; }
   if (btnX) { btnX.disabled = false; btnX.innerText = 'ТЕКСЕРУ'; }
-  
+
   updateHookeSim();
 }
 
@@ -1866,7 +2011,7 @@ function checkHookeCalculation(type) {
     const userVal = parseFloat(input.value);
     const F = hookeLabState.mass * 10;
     const correctVal = (F / hookeLabState.k) * 100; // in cm
-    
+
     if (Math.abs(userVal - correctVal) < 0.5) {
       hookeLabState.isSolvedX = true;
       hookeLabState.feedbackX = `<div class="animate-scale-in" style="color: #3b82f6; font-weight: 700; margin-top: 0.5rem;">Керемет! Ұзару дәл табылды.</div>`;
@@ -1918,8 +2063,8 @@ function updateHookeSim() {
         <!-- Load (Weight) -->
         <g transform="translate(0, ${springHeight})">
            <path d="M 0 0 L 0 15" stroke="#334155" stroke-width="2" />
-           <rect x="-${weightSize/2}" y="15" width="${weightSize}" height="${weightSize}" rx="12" fill="#1e293b" />
-           <text y="${15 + weightSize/2 + 5}" text-anchor="middle" fill="white" font-size="14" font-weight="900">${m} кг</text>
+           <rect x="-${weightSize / 2}" y="15" width="${weightSize}" height="${weightSize}" rx="12" fill="#1e293b" />
+           <text y="${15 + weightSize / 2 + 5}" text-anchor="middle" fill="white" font-size="14" font-weight="900">${m} кг</text>
         </g>
       </g>
       
@@ -1928,7 +2073,7 @@ function updateHookeSim() {
         <line x1="0" y1="0" x2="0" y2="300" stroke="#94a3b8" stroke-width="2" />
         ${[0, 50, 100, 150, 200, 250, 300].map(y => `
           <line x1="0" y1="${y}" x2="10" y2="${y}" stroke="#94a3b8" stroke-width="2" />
-          <text x="15" y="${y+5}" font-size="10" fill="#94a3b8">${y/10} см</text>
+          <text x="15" y="${y + 5}" font-size="10" fill="#94a3b8">${y / 10} см</text>
         `).join('')}
       </g>
     </svg>
@@ -1940,8 +2085,8 @@ function generateSpringPath(height) {
   const radius = 20;
   const step = height / turns;
   let p = "M 0 0";
-  for(let i=0; i<turns; i++) {
-    p += ` L ${radius} ${i*step + step/4} L ${-radius} ${i*step + 3*step/4} L 0 ${i*step + step}`;
+  for (let i = 0; i < turns; i++) {
+    p += ` L ${radius} ${i * step + step / 4} L ${-radius} ${i * step + 3 * step / 4} L 0 ${i * step + step}`;
   }
   return p;
 }
@@ -2000,51 +2145,7 @@ window.onload = () => {
   initSnowfall();
 };
 
-window.showResourceLibrary = function(containerId = 'student-content', backFnName = 'renderStudentDashboard') {
-  const content = document.getElementById(containerId) || document.getElementById('student-view');
-  if (!content) return;
 
-  const books = [
-    {
-      grade: '7',
-      title: 'Физика 7-сынып',
-      year: '2017 год',
-      lang: 'Казахский',
-      cover: 'media/textbooks/basharuly_7.png',
-      url: 'https://pdf.okulyk.kz/248/248.pdf'
-    }
-  ];
-
-  content.innerHTML = `
-    <div class="animate-fade-in" style="padding: 1rem;">
-      <button class="btn-secondary voice-target v-center" onclick="${backFnName}()" style="margin-bottom: 3rem; gap: 0.8rem; padding: 0.8rem 1.5rem; border-radius: 50px; font-weight: 700;">
-        <i data-lucide="arrow-left" size="20"></i> Басты бетке қайту
-      </button>
-
-      <div class="flex flex-col items-center text-center" style="margin-bottom: 4rem;">
-        <div style="background: rgba(var(--accent-orange-rgb), 0.1); color: var(--accent-orange); width: 80px; height: 80px; border-radius: 24px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem;">
-          <i data-lucide="book-marked" size="40"></i>
-        </div>
-        <h2 style="font-size: 3rem; font-weight: 900; color: var(--text-primary); margin-bottom: 1rem;">Электрондық оқулықтар</h2>
-        <p style="color: var(--text-secondary); font-size: 1.2rem; max-width: 600px; line-height: 1.6;">Сізге қажетті оқулықты таңдап, оны онлайн оқыңыз немесе жүктеп алыңыз.</p>
-      </div>
-
-      <div class="book-gallery">
-        ${books.map(book => `
-          <div class="book-item-card voice-target animate-scale-in" onclick="window.open('${book.url}', '_blank')">
-            <div class="book-cover-wrapper">
-              <div class="badge-year">${book.year}</div>
-              <img src="${book.cover}" class="book-cover-img" alt="${book.title}">
-              <div class="badge-lang">${book.lang}</div>
-            </div>
-            <h3 class="book-item-title">Физика 7-сынып</h3>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `;
-  if (window.lucide) lucide.createIcons();
-}
 
 
 

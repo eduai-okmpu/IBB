@@ -4,10 +4,10 @@
 
 let currentTeacherChatId = null;
 
-window.showAIAssistant = function() {
+window.showAIAssistant = function () {
   const content = document.getElementById('teacher-ai-view');
   if (!content) return;
-  
+
   // If no chat selected, create or pick latest
   if (!currentTeacherChatId) {
     if (state.teacherAIChats.length > 0) {
@@ -22,7 +22,7 @@ window.showAIAssistant = function() {
   content.innerHTML = `
     <div class="flex flex-col animate-fade-in" style="height: 85vh; gap: 1.5rem; padding: 2rem 0;">
       <div class="flex justify-between items-center">
-        <button class="btn-secondary voice-target" onclick="window.navigate('teacher')" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;">
+        <button class="btn-secondary voice-target" onclick="navigate('teacher')" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;">
           <i data-lucide="arrow-left" size="18"></i> Басты бетке қайту
         </button>
         <div class="flex items-center" style="gap: 0.75rem;">
@@ -65,17 +65,17 @@ window.showAIAssistant = function() {
       </div>
     </div>
   `;
-  
+
   if (window.renderTeacherChatMessages) window.renderTeacherChatMessages();
   if (window.lucide) lucide.createIcons();
 }
 
-window.createNewTeacherAIChat = function() {
+window.createNewTeacherAIChat = function () {
   const newChat = {
     id: Date.now(),
     title: 'Жаңа сөйлесу',
     messages: [
-      { role: 'ai', text: 'Сәлеметсіз бе! Мен сіздің AI көмекшіңізбін. Сабақ жоспарын құруға, есептер шығаруға немесе физикадан кез келген сұраққа жауап беруге дайынмын.', time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }
+      { role: 'ai', text: 'Сәлеметсіз бе! Мен сіздің AI көмекшіңізбін. Сабақ жоспарын құруға, есептер шығаруға немесе физикадан кез келген сұраққа жауап беруге дайынмын.', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
     ],
     lastUpdate: new Date()
   };
@@ -84,10 +84,10 @@ window.createNewTeacherAIChat = function() {
   window.showAIAssistant();
 }
 
-window.renderTeacherChatMessages = function() {
+window.renderTeacherChatMessages = function () {
   const container = document.getElementById('teacher-chat-messages');
   if (!container) return;
-  
+
   const chat = state.teacherAIChats.find(c => c.id === currentTeacherChatId);
   if (!chat) return;
 
@@ -102,11 +102,11 @@ window.renderTeacherChatMessages = function() {
       <span style="font-size: 0.7rem; color: var(--text-tertiary); margin: 0 0.5rem;">${msg.time}</span>
     </div>
   `).join('');
-  
+
   container.scrollTop = container.scrollHeight;
 }
 
-window.sendTeacherAIMessage = function() {
+window.sendTeacherAIMessage = function () {
   const input = document.getElementById('teacher-chat-input');
   if (!input) return;
   const text = input.value.trim();
@@ -116,10 +116,10 @@ window.sendTeacherAIMessage = function() {
   if (!chat) return;
 
   // Add User Message
-  const userMsg = { role: 'user', text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+  const userMsg = { role: 'user', text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
   chat.messages.push(userMsg);
   chat.lastUpdate = new Date();
-  
+
   // Set title based on first user message if it's still "New Chat"
   if (chat.title === 'Жаңа сөйлесу') {
     chat.title = text.length > 25 ? text.substring(0, 25) + '...' : text;
@@ -154,20 +154,20 @@ window.sendTeacherAIMessage = function() {
       aiText += `\n\nБұл тақырып бойынша қосымша мәліметтер керек болса немесе есеп шығару қажет болса, хабарласыңыз. Мен сізге көмектесуге әрқашан дайынмын.`;
     }
 
-    const aiMsg = { role: 'ai', text: aiText, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+    const aiMsg = { role: 'ai', text: aiText, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
     chat.messages.push(aiMsg);
     chat.lastUpdate = new Date();
-    
+
     window.renderTeacherChatMessages();
     if (window.speakText) window.speakText("Жаңа хабарлама келді.");
     if (window.lucide) lucide.createIcons();
   }, 1800);
 }
 
-window.showTeacherAIHistory = function() {
+window.showTeacherAIHistory = function () {
   const content = document.getElementById('teacher-ai-view');
   if (!content) return;
-  
+
   const sortedChats = [...state.teacherAIChats].sort((a, b) => new Date(b.lastUpdate) - new Date(a.lastUpdate));
 
   content.innerHTML = `
@@ -203,24 +203,80 @@ window.showTeacherAIHistory = function() {
       </div>
     </div>
   `;
-  
+
   if (window.lucide) lucide.createIcons();
 }
 
-window.loadTeacherAIChat = function(id) {
+window.loadTeacherAIChat = function (id) {
   currentTeacherChatId = id;
   window.showAIAssistant();
 }
 
 
 let currentManagerTab = 'list'; // 'list' or 'results'
+let currentStudentAuthData = []; // Full user data from Google Sheet
 
-window.showClassManager = function() {
+window.syncStudentsWithServer = async function () {
+  const loading = document.getElementById('auth-loading');
+  if (loading) loading.style.display = 'flex';
+
+  try {
+    const url = `${GOOGLE_SCRIPTS_AUTH_URL}?action=listUsers`;
+    const response = await fetch(url);
+    currentStudentAuthData = await response.json();
+
+    // Only process users with 'student' role
+    const serverStudents = currentStudentAuthData.filter(u => u.role === 'student');
+
+    // Build new state from server data, preserving local points/level if they exist
+    const syncedList = serverStudents.map(su => {
+      const suName = String(su.name || '').trim();
+      const suEmail = String(su.email || '').trim();
+
+      const local = state.allStudents.find(s =>
+        String(s.email || '').toLowerCase() === suEmail.toLowerCase()
+      );
+
+      if (local) {
+        return {
+          ...local,
+          name: suName,
+          email: suEmail,
+          grade: su.grade || local.grade || 'Белгісіз'
+        };
+      } else {
+        return {
+          id: Date.now() + Math.random(),
+          name: suName,
+          email: suEmail,
+          grade: su.grade || 'Белгісіз',
+          points: 0,
+          level: 1,
+          school: state.teacherProfile.school || '№15 ІТ мектеп-лицейі'
+        };
+      }
+    });
+
+    state.allStudents = syncedList;
+    saveState();
+
+    // Refresh the UI if it's currently showing the class manager
+    if (typeof filterClassManager === 'function') {
+      filterClassManager();
+    }
+  } catch (error) {
+    console.error('Sync Error:', error);
+  } finally {
+    if (loading) loading.style.display = 'none';
+  }
+};
+
+window.showClassManager = function () {
   const content = document.getElementById('teacher-class-view');
-  
+
   const teacherClassesRaw = state.teacherProfile.classes || '';
   const availableClasses = teacherClassesRaw.split(',').map(c => c.trim().replace(/["']/g, '')).filter(c => c);
-  
+
   content.innerHTML = `
     <div class="animate-fade-in" style="padding: 2rem 0;">
     <button class="btn-secondary voice-target" onclick="navigate('teacher')" style="margin-bottom: 2rem; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;">
@@ -251,19 +307,19 @@ window.showClassManager = function() {
       </div>
 
       
-      <!-- List Controls (Search & Filter) - Relocated for better mobile UX -->
-      <div class="flex flex-col md-flex-row items-stretch md-items-center gap-4" style="margin-bottom: 2rem;">
-        <div class="v-center glass-panel" style="flex: 2; min-width: 200px; padding: 0.7rem 1.2rem; border-radius: 15px; border: 1px solid var(--border-glass); background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+      <!-- List Controls (Search & Filter) -->
+      <div class="flex flex-col lg-flex-row items-stretch lg-items-center gap-4" style="margin-bottom: 2rem;">
+        <div class="v-center glass-panel" style="flex: 3; min-width: 200px; padding: 0.7rem 1.2rem; border-radius: 15px; border: 1px solid var(--border-glass); background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
           <i data-lucide="search" size="20" style="color: var(--text-tertiary); margin-right: 0.75rem;"></i>
           <input type="text" id="class-manager-search" placeholder="Оқушы есімімен іздеу..." 
                  style="border: none; outline: none; background: transparent; font-size: 1rem; width: 100%;" 
                  oninput="filterClassManager()">
         </div>
         
-        <div class="flex items-center gap-3" style="flex: 1; min-width: 140px;">
-          <label class="label-caps hide-mobile" style="margin: 0; white-space: nowrap;">Сынып бойынша:</label>
+        <div class="flex items-center gap-3" style="flex: 2; min-width: 200px;">
+          <label class="label-caps hide-mobile" style="margin: 0; white-space: nowrap;">сынып бойынша:</label>
           <select id="teacher-class-filter" class="glass-panel" 
-                  style="flex: 1; padding: 0.7rem 1.2rem; border-radius: 12px; outline: none; border: 1px solid var(--border-glass); cursor: pointer; background: #fff; font-weight: 600;" 
+                  style="width: 100%; padding: 0.7rem 1.2rem; border-radius: 12px; outline: none; border: 1px solid var(--border-glass); cursor: pointer; background: #fff; font-weight: 600;" 
                   onchange="filterClassManager()">
             <option value="all">Сыныптар</option>
             ${availableClasses.map(c => `<option value="${c}">${c}</option>`).join('')}
@@ -271,7 +327,7 @@ window.showClassManager = function() {
         </div>
 
         ${currentManagerTab === 'list' ? `
-          <button class="btn-primary flex justify-center items-center gap-2" style="padding: 0.7rem 1.2rem; border-radius: 12px; cursor: pointer; white-space: nowrap; flex: 1; min-width: 160px;" onclick="showAddStudentModal()">
+          <button class="btn-primary flex justify-center items-center gap-2" style="padding: 0.8rem 1.5rem; border-radius: 12px; cursor: pointer; white-space: nowrap; flex: 1.5; min-width: 180px;" onclick="showAddStudentModal()">
             <i data-lucide="user-plus" size="20"></i> <span>Оқушы қосу</span>
           </button>
         ` : ''}
@@ -280,7 +336,7 @@ window.showClassManager = function() {
 
 
       <div style="overflow-x: auto;">
-          <table style="width: 100%; border-collapse: separate; border-spacing: 0 12px;">
+          <table class="student-table">
             <thead id="manager-thead">
               <!-- Content generated by filterClassManager() -->
             </thead>
@@ -293,39 +349,48 @@ window.showClassManager = function() {
     </div>
 
     <!-- Add Student Modal -->
-    <div id="add-student-modal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px); z-index: 9999; align-items: center; justify-content: center;">
-      <div class="glass-card animate-scale-in" style="width: 100%; max-width: 500px; padding: 3rem; background: #fff;">
-        <div class="flex justify-between items-center" style="margin-bottom: 2rem;">
-          <h3 style="font-size: 1.5rem; font-weight: 800;">Жаңа оқушы қосу</h3>
-          <button class="btn-secondary" onclick="window.closeAddStudentModal()" style="padding: 0.5rem; border-radius: 50%;"><i data-lucide="x"></i></button>
+    <div id="add-student-modal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px); z-index: 10000; align-items: center; justify-content: center;">
+      <div class="glass-card animate-scale-in" style="width: 100%; max-width: 500px; padding: 3rem; background: #fff; border-radius: 28px;">
+        <div class="flex justify-between items-center" style="margin-bottom: 2.5rem;">
+          <h3 style="font-size: 1.8rem; font-weight: 800;">Жаңа оқушы қосу</h3>
+          <button class="btn-secondary" onclick="window.closeAddStudentModal()" style="padding: 0.5rem; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;"><i data-lucide="x"></i></button>
         </div>
         <div class="flex flex-col gap-5">
           <div class="flex flex-col gap-2">
-            <label class="label-caps">Оқушының аты-жөні:</label>
-            <input type="text" id="new-student-name" placeholder="Мысалы: Дархан Саматұлы" class="glass-panel" style="padding: 1rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.02);">
+            <label class="label-caps" style="font-size: 0.75rem;">Оқушының аты-жөні:</label>
+            <input type="text" id="new-student-name" placeholder="Мысалы: Дархан Саматұлы" class="glass-panel" style="padding: 1rem; border-radius: 12px; border: 1px solid var(--border-glass); background: #f8fafc; font-size: 1rem;">
           </div>
+          
           <div class="flex flex-col gap-2">
-            <label class="label-caps">Сыныбы:</label>
-            <select id="new-student-grade" class="glass-panel" style="padding: 1rem; border-radius: 12px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.02);">
-              ${availableClasses.map(c => `<option value="${c}">${c}</option>`).join('')}
-            </select>
+            <label class="label-caps" style="font-size: 0.75rem;">Логин (Email):</label>
+            <input type="email" id="new-student-email" placeholder="example@mail.com" class="glass-panel" style="padding: 1rem; border-radius: 12px; border: 1px solid var(--border-glass); background: #f8fafc; font-size: 1rem;">
           </div>
-          <button class="btn-primary" onclick="window.addNewStudentToState()" style="margin-top: 1rem; padding: 1.2rem; border-radius: 12px; font-weight: 700;">Сақтау</button>
+
+          <div class="flex flex-col gap-2">
+            <label class="label-caps" style="font-size: 0.75rem;">Құпия сөз:</label>
+            <input type="text" id="new-student-password" placeholder="Пароль" class="glass-panel" style="padding: 1rem; border-radius: 12px; border: 1px solid var(--border-glass); background: #f8fafc; font-size: 1rem;">
+          </div>
+
+          <button id="add-student-btn" class="btn-primary" onclick="window.addNewStudentToState()" style="margin-top: 1rem; padding: 1.2rem; border-radius: 15px; font-weight: 800; font-size: 1.1rem; box-shadow: 0 10px 20px rgba(242, 109, 33, 0.2);">Сақтау</button>
         </div>
       </div>
     </div>
   `;
-  
-  filterClassManager();
+
+  if (currentManagerTab === 'list') {
+    window.syncStudentsWithServer().then(() => filterClassManager());
+  } else {
+    filterClassManager();
+  }
   lucide.createIcons();
 }
 
-window.switchManagerTab = function(tab) {
+window.switchManagerTab = function (tab) {
   currentManagerTab = tab;
   showClassManager();
 }
 
-window.showAddStudentModal = function() {
+window.showAddStudentModal = function () {
   const modal = document.getElementById('add-student-modal');
   if (modal) {
     modal.style.display = 'flex';
@@ -333,50 +398,79 @@ window.showAddStudentModal = function() {
   }
 }
 
-window.closeAddStudentModal = function() {
+window.closeAddStudentModal = function () {
   const modal = document.getElementById('add-student-modal');
   if (modal) modal.style.display = 'none';
 }
 
-window.addNewStudentToState = function() {
+window.addNewStudentToState = async function () {
   const name = document.getElementById('new-student-name').value.trim();
-  const grade = document.getElementById('new-student-grade').value;
-  
-  if (!name) {
-    alert("Оқушының атын енгізіңіз");
+  const email = document.getElementById('new-student-email').value.trim();
+  const password = document.getElementById('new-student-password').value.trim();
+
+  if (!name || !email || !password) {
+    alert("Барлық өрістерді толтырыңыз");
     return;
   }
 
-  const newStudent = {
-    id: Date.now(),
-    name: name,
-    grade: grade,
-    points: 0,
-    level: 1,
-    school: state.teacherProfile.school || '№15 ІТ мектеп-лицейі'
-  };
+  const btn = document.getElementById('add-student-btn');
+  const originalText = btn.innerText;
+  btn.innerText = "Сақталуда...";
+  btn.disabled = true;
 
-  state.allStudents.push(newStudent);
-  saveState();
-  closeAddStudentModal();
-  filterClassManager();
-  if (window.playSound) window.playSound('correct');
-  if (window.speakText) window.speakText('Жаңа оқушы тізімге қосылды.');
+  try {
+    const params = new URLSearchParams({
+      action: 'register',
+      name: name,
+      email: email,
+      password: password,
+      role: 'student'
+    });
+
+    const response = await fetch(`${GOOGLE_SCRIPTS_AUTH_URL}?${params.toString()}`);
+    const result = await response.json();
+
+    if (result.success) {
+      // Local addition
+      const newStudent = {
+        id: Date.now(),
+        name: name,
+        grade: 'Белгісіз', // Will be updated by teacher later or defaults
+        points: 0,
+        level: 1,
+        school: state.teacherProfile.school || '№15 ІТ мектеп-лицейі'
+      };
+      state.allStudents.push(newStudent);
+      saveState();
+
+      alert('Оқушы сәтті тіркелді!');
+      closeAddStudentModal();
+      window.showClassManager(); // Refresh list via sync
+    } else {
+      alert(result.message || "Тіркеу кезінде қате орын алды");
+    }
+  } catch (error) {
+    console.error('Add Student Error:', error);
+    alert("Сервермен байланыс қатесі");
+  } finally {
+    btn.innerText = originalText;
+    btn.disabled = false;
+  }
 }
 
-window.deleteStudentFromState = function(id) {
+window.deleteStudentFromState = function (id) {
   if (!confirm("Оқушыны тізімнен өшіруді мақұлдайсыз ба?")) return;
   state.allStudents = state.allStudents.filter(s => s.id !== id);
   saveState();
   filterClassManager();
 }
 
-window.filterClassManager = function() {
+window.filterClassManager = function () {
   const filterVal = document.getElementById('teacher-class-filter').value;
   const searchVal = document.getElementById('class-manager-search').value.toLowerCase();
   const thead = document.getElementById('manager-thead');
   const tbody = document.getElementById('class-manager-tbody');
-  
+
   const teacherClassesRaw = state.teacherProfile.classes || '';
   const teacherClasses = teacherClassesRaw.split(',').map(c => c.trim().replace(/["']/g, ''));
 
@@ -395,7 +489,7 @@ window.filterClassManager = function() {
     let filteredResults = state.quizResults.filter(res => {
       const resGrade = (res.grade || '').trim().toLowerCase().replace(/["']/g, '').replace(/[aа]/g, 'а').replace(/[eе]/g, 'е').replace(/[oо]/g, 'о').replace(/[kк]/g, 'к');
       const matchesSearch = (res.studentName || '').toLowerCase().includes(searchVal);
-      
+
       const isInTeacherClass = teacherClasses.some(tc => {
         const cleanTc = tc.trim().toLowerCase().replace(/["']/g, '').replace(/[aа]/g, 'а').replace(/[eе]/g, 'е').replace(/[oо]/g, 'о').replace(/[kк]/g, 'к');
         return cleanTc === resGrade;
@@ -435,17 +529,17 @@ window.filterClassManager = function() {
     // RENDER STUDENT LIST VIEW
     thead.innerHTML = `
       <tr class="label-caps" style="text-align: left; opacity: 0.6;">
-        <th style="padding: 0 1rem 1rem 1rem;">Оқушы</th>
-        <th style="padding: 0 1rem 1rem 1rem;">Сынып</th>
-        <th style="padding: 0 1rem 1rem 1rem;">Мектеп</th>
-        <th style="padding: 0 1rem 1rem 1rem; text-align: right;">Әрекет</th>
+        <th class="col-student">Оқушы</th>
+        <th class="col-grade">Сынып</th>
+        <th class="col-school">Мектеп</th>
+        <th class="col-action">Әрекет</th>
       </tr>
     `;
 
     let filteredStudents = state.allStudents.filter(s => {
       const sGrade = (s.grade || '').trim().toLowerCase().replace(/["']/g, '').replace(/[aа]/g, 'а').replace(/[eе]/g, 'е').replace(/[oо]/g, 'о').replace(/[kк]/g, 'к');
-      const matchesSearch = (s.name || '').toLowerCase().includes(searchVal);
-      
+      const matchesSearch = String(s.name || '').toLowerCase().includes(searchVal);
+
       const isInTeacherClass = teacherClasses.some(tc => {
         const cleanTc = tc.trim().toLowerCase().replace(/["']/g, '').replace(/[aа]/g, 'а').replace(/[eе]/g, 'е').replace(/[oо]/g, 'о').replace(/[kк]/g, 'к');
         return cleanTc === sGrade;
@@ -455,30 +549,131 @@ window.filterClassManager = function() {
       if (filterVal !== 'all' && sGrade !== filterVal.toLowerCase().replace(/["']/g, '').replace(/[aа]/g, 'а').replace(/[eе]/g, 'е').replace(/[oо]/g, 'о').replace(/[kк]/g, 'к')) return false;
       if (searchVal && !matchesSearch) return false;
       return true;
-    }).sort((a,b) => a.name.localeCompare(b.name));
+    }).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 
     if (filteredStudents.length === 0) {
       tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 3rem; color: var(--text-tertiary);">Оқушылар табылмады</td></tr>`;
     } else {
-      tbody.innerHTML = filteredStudents.map(s => `
-        <tr style="background: rgba(255,255,255,0.4); backdrop-filter: blur(8px); border-radius: 16px; transition: transform 0.2s ease;">
-          <td style="padding: 1.2rem; border-radius: 16px 0 0 16px;">
-            <div class="flex items-center gap-3">
-              <div style="width: 35px; height: 35px; border-radius: 50%; background: var(--primary-gradient); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.8rem;">${s.name.charAt(0)}</div>
-              <span style="font-weight: 700;">${s.name}</span>
-            </div>
-          </td>
-          <td style="padding: 1.2rem;">${s.grade}</td>
-          <td style="padding: 1.2rem; font-size: 0.85rem; color: var(--text-secondary);">${s.school}</td>
-          <td style="padding: 1.2rem; border-radius: 0 16px 16px 0; text-align: right;">
-            <button class="btn-secondary" style="padding: 0.5rem; border-radius: 10px; color: #ef4444;" onclick="deleteStudentFromState(${s.id})"><i data-lucide="trash-2" size="18"></i></button>
-          </td>
-        </tr>
-      `).join('');
+      tbody.innerHTML = filteredStudents.map(s => {
+        const authInfo = currentStudentAuthData.find(u => String(u.email || '').toLowerCase() === String(s.email || '').toLowerCase());
+        return `
+          <tr class="student-row animate-hover" onclick="window.showStudentDetail('${s.email}')" style="background: rgba(255,255,255,0.4); backdrop-filter: blur(8px); border-radius: 16px; transition: all 0.2s ease; cursor: pointer;">
+            <td class="col-student" style="border-radius: 16px 0 0 16px;">
+              <div class="flex items-center gap-3">
+                <div style="width: 35px; height: 35px; border-radius: 50%; background: var(--primary-gradient); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.8rem;">${s.name.charAt(0)}</div>
+                <div class="flex flex-col">
+                  <span style="font-weight: 700;">${s.name}</span>
+                  ${authInfo ? `<span style="font-size: 0.7rem; color: var(--text-tertiary);">${authInfo.email}</span>` : ''}
+                </div>
+              </div>
+            </td>
+            <td class="col-grade">${s.grade}</td>
+            <td class="col-school" style="font-size: 0.85rem; color: var(--text-secondary);">${s.school}</td>
+            <td class="col-action" style="border-radius: 0 16px 16px 0;">
+              <button class="btn-secondary" style="padding: 0.5rem; border-radius: 10px; color: #ef4444; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;" onclick="event.stopPropagation(); deleteStudentFromState(${s.id})"><i data-lucide="trash-2" size="18"></i></button>
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
   }
-  
+
   lucide.createIcons();
+}
+
+window.showStudentDetail = function (email) {
+  const student = state.allStudents.find(s => String(s.email).toLowerCase() === String(email).toLowerCase());
+  const auth = currentStudentAuthData.find(u => String(u.email).toLowerCase() === String(email).toLowerCase());
+
+  const name = student ? student.name : (auth ? auth.name : 'Белгісіз');
+
+  const modalId = 'student-detail-modal';
+  let modal = document.getElementById(modalId);
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'modal-backdrop';
+    modal.style.cssText = 'display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px); z-index: 10000; align-items: center; justify-content: center;';
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div class="glass-card animate-scale-in" style="width: 100%; max-width: 450px; padding: 2.5rem; background: #fff; border-radius: 24px;">
+      <div class="flex justify-between items-center" style="margin-bottom: 2rem;">
+        <h3 style="font-size: 1.5rem; font-weight: 800;">Оқушы мәліметі</h3>
+        <button class="btn-secondary" onclick="document.getElementById('${modalId}').style.display = 'none'" style="padding: 0.5rem; border-radius: 50%;"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="flex flex-col gap-4">
+        <div class="flex-center flex-col gap-2" style="margin-bottom: 1rem;">
+          <div style="width: 70px; height: 70px; border-radius: 50%; background: var(--primary-gradient); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 800;">${name.charAt(0)}</div>
+          <h4 style="font-size: 1.2rem;">${name}</h4>
+          <p style="color: var(--text-tertiary); font-size: 0.85rem;">${student ? student.grade : ''} | ${student ? student.school : ''}</p>
+        </div>
+
+        <div class="glass-panel" style="padding: 1.5rem; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.02); border-radius: 16px;">
+          <h5 class="label-caps" style="margin-bottom: 1rem; color: var(--accent-orange);">Кіру мәліметтері</h5>
+          
+          <div class="flex flex-col gap-3">
+            <div class="flex flex-col gap-1">
+              <label style="font-size: 0.75rem; font-weight: 700; opacity: 0.7;">Логин (Email)</label>
+              <input type="email" id="edit-student-email" value="${auth ? auth.email : ''}" class="glass-panel" style="padding: 0.8rem; border-radius: 10px; border: 1px solid var(--border-glass); font-size: 0.9rem;">
+            </div>
+            <div class="flex flex-col gap-1">
+              <label style="font-size: 0.75rem; font-weight: 700; opacity: 0.7;">Пароль</label>
+              <input type="text" id="edit-student-password" value="${auth ? auth.password : ''}" class="glass-panel" style="padding: 0.8rem; border-radius: 10px; border: 1px solid var(--border-glass); font-size: 0.9rem;">
+            </div>
+          </div>
+        </div>
+
+        <input type="hidden" id="edit-student-old-email" value="${auth ? auth.email : ''}">
+        
+        <button class="btn-primary" onclick="window.updateStudentRemote()" style="margin-top: 1rem; padding: 1rem; border-radius: 12px; font-weight: 700; font-size: 1rem;">Өзгерістерді сақтау</button>
+      </div>
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+  lucide.createIcons();
+}
+
+window.updateStudentRemote = async function () {
+  const oldEmailInput = document.getElementById('edit-student-old-email');
+  const oldEmail = oldEmailInput ? oldEmailInput.value : '';
+  const newEmail = document.getElementById('edit-student-email').value.trim();
+  const newPassword = document.getElementById('edit-student-password').value.trim();
+
+  if (!newEmail || !newPassword) return alert("Логин мен парольді толтырыңыз");
+
+  const saveBtn = event.target;
+  const originalText = saveBtn.innerText;
+  saveBtn.innerText = "Сақталуда...";
+  saveBtn.disabled = true;
+
+  try {
+    const params = new URLSearchParams({
+      action: 'updateUser',
+      oldEmail: oldEmail,
+      newEmail: newEmail,
+      newPassword: newPassword
+    });
+
+    const response = await fetch(`${GOOGLE_SCRIPTS_AUTH_URL}?${params.toString()}`);
+    const result = await response.json();
+
+    if (result.success) {
+      document.getElementById('student-detail-modal').style.display = 'none';
+      window.showClassManager(); // Refresh list
+    } else {
+      alert(result.message || "Қате орын алды");
+    }
+  } catch (error) {
+    console.error('Update Error:', error);
+    alert("Сервермен байланыс қатесі");
+  } finally {
+    saveBtn.innerText = originalText;
+    saveBtn.disabled = false;
+  }
 }
 
 
@@ -891,7 +1086,7 @@ function speak(text) {
 
 window.speakText = speak;
 
-window.toggleQuizAudio = function() {
+window.toggleQuizAudio = function () {
   quizSession.isMuted = !quizSession.isMuted;
   if (quizSession.isMuted) window.speechSynthesis.cancel();
   const btn = document.getElementById('quiz-audio-toggle');
@@ -907,11 +1102,12 @@ function showAssignments() {
   const content = document.getElementById('teacher-content');
   const topicsHtml = Object.keys(physicsDb.questions).map(topic => `<option value="${topic}">${topic}</option>`).join('');
   content.innerHTML = `
-    <button class="btn-secondary voice-target" onclick="renderTeacherDashboard()" style="margin-bottom: 2rem; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;">
+    <button class="btn-secondary voice-target" onclick="navigate('teacher')" style="margin-bottom: 2rem; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;">
       <i data-lucide="arrow-left" size="18"></i> Басты бетке қайту
     </button>
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.5rem;">
-    <div class="grid gap-8" style="grid-template-columns: 350px 1fr; align-items: start;">
+    <h2 class="gradient-text voice-target" style="font-size: 2.5rem; font-weight: 800; margin-bottom: 2.5rem;">Тапсырмалар менеджері</h2>
+    
+    <div class="grid gap-8" style="grid-template-columns: 320px 1fr; align-items: start;">
        <div class="glass-panel flex flex-col gap-6" style="padding: 2rem; border-radius: 20px;">
          <h3 class="label-caps" style="color: var(--accent-orange); font-size: var(--font-lg); display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="settings-2"></i> Параметрлерді реттеу</h3>
          <div class="flex flex-col gap-2">
@@ -935,9 +1131,9 @@ function showAssignments() {
          </div>
          <button class="btn-primary v-center h-center label-caps" onclick="generateTaskPreview()" style="margin-top: 1rem; padding: 1.2rem; font-size: var(--font-base); border-radius: 12px; gap: 0.5rem;"><i data-lucide="sparkles" size="18"></i> Генерациялау</button>
        </div>
-       <div id="task-preview-area" class="glass-panel flex flex-col items-center justify-center text-center" style="min-height: 520px; border: 2px dashed var(--border-glass); background: rgba(255,255,255,0.2); border-radius: 24px;">
+       <div id="task-preview-area" class="glass-panel flex flex-col items-center justify-center text-center" style="min-height: 520px; border: 2px dashed var(--border-glass); background: rgba(255,255,255,0.2); border-radius: 24px; padding: 2rem;">
           <div style="color: var(--text-tertiary); margin-bottom: 1.5rem;"><i data-lucide="layout-template" size="64"></i></div>
-          <h4 style="color: var(--text-secondary); max-width: 300px; line-height: 1.5;">Бөлім мен параметрлерді таңдап, тестті бастаңыз</h4>
+          <h4 style="color: var(--text-secondary); max-width: 300px; line-height: 1.5; text-align: center; margin: 0 auto;">Бөлім мен параметрлерді таңдап, тестті бастаңыз</h4>
        </div>
     </div>
   `;
@@ -949,14 +1145,14 @@ function generateTaskPreview() {
   const topic = document.getElementById('topic-select').value;
   const count = parseInt(document.getElementById('count-select').value);
   const time = parseInt(document.getElementById('timer-select').value);
-  if(mode === 'quiz') startQuizSession(topic, count, time);
+  if (mode === 'quiz') startQuizSession(topic, count, time);
   else renderMatchGame();
 }
 
 function startQuizSession(topic, count, time) {
   const allQuestions = physicsDb.questions[topic] || [];
   const shuffled = [...allQuestions].sort(() => Math.random() - 0.5).slice(0, count);
-  if(shuffled.length === 0) { alert("Сұрақтар табылмады."); return; }
+  if (shuffled.length === 0) { alert("Сұрақтар табылмады."); return; }
   quizSession = { questions: shuffled, currentIndex: 0, score: 0, timer: null, timeLeft: time, initialTime: time, isMuted: quizSession.isMuted };
   renderQuizQuestion();
 }
@@ -964,30 +1160,30 @@ function startQuizSession(topic, count, time) {
 function renderQuizQuestion() {
   const preview = document.getElementById('task-preview-area');
   const q = quizSession.questions[quizSession.currentIndex];
-  if(!q) { renderQuizResults(); return; }
-  if(quizSession.timer) clearInterval(quizSession.timer);
+  if (!q) { renderQuizResults(); return; }
+  if (quizSession.timer) clearInterval(quizSession.timer);
   quizSession.timeLeft = quizSession.initialTime;
-  
+
   let options = q.options.map((opt, index) => ({ text: opt, isCorrect: index === q.answer }));
   options = options.sort(() => Math.random() - 0.5);
 
   preview.innerHTML = `
-    <div class="flex flex-col w-full h-full animate-fade-in" style="padding: 2.5rem; text-align: left; background: #fff; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.05); position: relative; border: 1px solid var(--border-glass); overflow: hidden;">
-      <div class="v-center justify-between" style="margin-bottom: 1.5rem;">
-        <div class="v-center gap-6">
+    <div class="flex flex-col w-full h-full animate-fade-in" style="padding: 3rem; text-align: left; background: #fff; border-radius: 32px; box-shadow: 0 15px 45px rgba(0,0,0,0.08); position: relative; border: 1px solid var(--border-glass); overflow: hidden;">
+      <div class="flex justify-between items-center" style="margin-bottom: 2.5rem;">
+        <div class="flex items-center gap-8">
           <div class="flex flex-col">
-            <span class="label-caps">Сұрақ</span>
-            <span style="font-weight: 800; color: var(--accent-orange); font-size: var(--font-lg);">${quizSession.currentIndex + 1} / ${quizSession.questions.length}</span>
+            <span class="label-caps" style="font-size: 0.75rem; color: var(--text-tertiary);">Сұрақ</span>
+            <span style="font-weight: 800; color: var(--accent-orange); font-size: 1.4rem;">${quizSession.currentIndex + 1} / ${quizSession.questions.length}</span>
           </div>
-          <div style="width: 1px; height: 30px; background: var(--border-glass);"></div>
+          <div style="width: 1px; height: 40px; background: var(--border-glass);"></div>
           <div class="flex flex-col">
-            <span class="label-caps">Ұпай</span>
-            <span style="font-size: var(--font-lg); color: var(--text-secondary); font-weight: 800;">${quizSession.score}</span>
+            <span class="label-caps" style="font-size: 0.75rem; color: var(--text-tertiary);">Ұпай</span>
+            <span style="font-size: 1.4rem; color: var(--text-secondary); font-weight: 800;">${quizSession.score}</span>
           </div>
         </div>
-        <div class="v-center gap-3">
-          <div id="quiz-timer" class="flex-center" style="padding: 0.6rem 1rem; background: #f8fafc; border: 2px solid var(--border-glass); border-radius: 12px; font-weight: 900; font-size: var(--font-xl); min-width: 80px;">${quizSession.timeLeft}с</div>
-          <button id="quiz-audio-toggle" class="btn-secondary flex-center" onclick="toggleQuizAudio()" style="width: 48px; height: 48px; padding: 0; border-radius: 12px;"><i data-lucide="${quizSession.isMuted ? 'volume-x' : 'volume-2'}" size="22"></i></button>
+        <div class="flex items-center gap-4">
+          <div id="quiz-timer" class="flex-center" style="padding: 0.8rem 1.5rem; background: #f8fafc; border: 2.5px solid var(--border-glass); border-radius: 16px; font-weight: 900; font-size: 1.8rem; min-width: 100px; font-family: monospace;">${quizSession.timeLeft}с</div>
+          <button id="quiz-audio-toggle" class="btn-secondary flex-center" onclick="toggleQuizAudio()" style="width: 56px; height: 56px; padding: 0; border-radius: 16px; border: 1.5px solid var(--border-glass);"><i data-lucide="${quizSession.isMuted ? 'volume-x' : 'volume-2'}" size="24"></i></button>
         </div>
       </div>
       
@@ -1001,7 +1197,7 @@ function renderQuizQuestion() {
       <div class="grid gap-3" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
         ${options.map((opt, i) => `
           <button class="quiz-btn v-center gap-4" onclick="handleQuizAnswer(this, ${opt.isCorrect})" onmouseenter="speak('${opt.text.replace(/'/g, "\\'")}')" style="padding: 1.2rem; border-radius: 16px; border: 2px solid var(--border-glass); background: #f8fafc; text-align: left; transition: all 0.2s; cursor: pointer;">
-            <div class="quiz-badge">${String.fromCharCode(65+i)}</div>
+            <div class="quiz-badge">${String.fromCharCode(65 + i)}</div>
             <span style="font-size: var(--font-base); font-weight: 600; color: var(--text-primary);">${opt.text}</span>
           </button>
         `).join('')}
@@ -1009,38 +1205,38 @@ function renderQuizQuestion() {
     </div>
   `;
   lucide.createIcons();
-  
+
   quizSession.timer = setInterval(() => {
     quizSession.timeLeft--;
     const timerDisplay = document.getElementById('quiz-timer');
-    if(timerDisplay) {
-        const tVal = Math.max(0, quizSession.timeLeft);
-        timerDisplay.innerText = tVal + 'с';
-        if(quizSession.timeLeft <= 10) timerDisplay.style.color = 'var(--accent-red)';
+    if (timerDisplay) {
+      const tVal = Math.max(0, quizSession.timeLeft);
+      timerDisplay.innerText = tVal + 'с';
+      if (quizSession.timeLeft <= 10) timerDisplay.style.color = 'var(--accent-red)';
     }
-    if(quizSession.timeLeft <= 0) {
-      clearInterval(quizSession.timer); 
+    if (quizSession.timeLeft <= 0) {
+      clearInterval(quizSession.timer);
       playSound('wrong'); speakText('Уақыт бітті!');
       setTimeout(() => { quizSession.currentIndex++; renderQuizQuestion(); }, 1500);
     }
   }, 1000);
 }
 
-window.handleQuizAnswer = function(btn, isCorrect) {
+window.handleQuizAnswer = function (btn, isCorrect) {
   clearInterval(quizSession.timer);
   const btns = document.querySelectorAll('.quiz-btn');
   btns.forEach(b => b.disabled = true);
-  
-  if(isCorrect) { 
-    btn.style.borderColor = '#4ADE80'; 
+
+  if (isCorrect) {
+    btn.style.borderColor = '#4ADE80';
     btn.style.background = 'rgba(74, 222, 128, 0.05)';
-    quizSession.score++; playSound('correct'); speakText('Дұрыс жауап!'); 
-  } else { 
-    btn.style.borderColor = '#F87171'; 
+    quizSession.score++; playSound('correct'); speakText('Дұрыс жауап!');
+  } else {
+    btn.style.borderColor = '#F87171';
     btn.style.background = 'rgba(248, 113, 113, 0.05)';
-    playSound('wrong'); speakText('Қате жауап.'); 
+    playSound('wrong'); speakText('Қате жауап.');
   }
-  
+
   setTimeout(() => { quizSession.currentIndex++; renderQuizQuestion(); }, 1500);
 };
 
@@ -1048,7 +1244,7 @@ function renderQuizResults() {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
   const preview = document.getElementById('task-preview-area');
   const percent = Math.round((quizSession.score / quizSession.questions.length) * 100);
-  
+
   preview.style.background = 'transparent'; preview.style.border = 'none';
   preview.innerHTML = `
     <div class="glass-card flex flex-col items-center justify-center gap-8 w-full animate-fade-in" style="padding: 4rem 2rem; border-radius: 30px; text-align: center;">
@@ -1073,7 +1269,7 @@ function renderMatchGame() {
   const preview = document.getElementById('task-preview-area');
   let leftSide = [...physicsDb.matches].sort(() => Math.random() - 0.5);
   let rightSide = [...physicsDb.matches].sort(() => Math.random() - 0.5);
-  
+
   preview.style.background = 'transparent'; preview.style.border = 'none';
   preview.innerHTML = `
     <div class="glass-card w-full h-full animate-fade-in" style="padding: 2.5rem; text-align: left; border-radius: 24px;">
@@ -1095,42 +1291,42 @@ function renderMatchGame() {
   lucide.createIcons();
 }
 
-window.handleMatchSelection = function(btn, side) {
-  if(!window.matchState) window.matchState = { left: null, right: null };
+window.handleMatchSelection = function (btn, side) {
+  if (!window.matchState) window.matchState = { left: null, right: null };
   const parent = btn.parentElement;
-  parent.querySelectorAll('.match-btn').forEach(b => { if(!b.disabled) b.style.borderColor = 'var(--border-glass)'; });
-  
+  parent.querySelectorAll('.match-btn').forEach(b => { if (!b.disabled) b.style.borderColor = 'var(--border-glass)'; });
+
   window.matchState[side] = btn;
   btn.style.borderColor = 'var(--accent-orange)';
-  
-  if(window.matchState.left && window.matchState.right) {
-      if(window.matchState.left.getAttribute('data-term') === window.matchState.right.getAttribute('data-term')) {
-          playSound('correct');
-          window.matchState.left.style.borderColor = '#4ADE80'; window.matchState.left.style.background = 'rgba(74, 222, 128, 0.05)';
-          window.matchState.right.style.borderColor = '#4ADE80'; window.matchState.right.style.background = 'rgba(74, 222, 128, 0.05)';
-          window.matchState.left.disabled = true; window.matchState.right.disabled = true;
-      } else {
-          playSound('wrong');
-          const l = window.matchState.left, r = window.matchState.right;
-          setTimeout(() => { 
-            if(!l.disabled) l.style.borderColor = ''; 
-            if(!r.disabled) r.style.borderColor = ''; 
-          }, 400);
-      }
-      window.matchState.left = null; window.matchState.right = null;
+
+  if (window.matchState.left && window.matchState.right) {
+    if (window.matchState.left.getAttribute('data-term') === window.matchState.right.getAttribute('data-term')) {
+      playSound('correct');
+      window.matchState.left.style.borderColor = '#4ADE80'; window.matchState.left.style.background = 'rgba(74, 222, 128, 0.05)';
+      window.matchState.right.style.borderColor = '#4ADE80'; window.matchState.right.style.background = 'rgba(74, 222, 128, 0.05)';
+      window.matchState.left.disabled = true; window.matchState.right.disabled = true;
+    } else {
+      playSound('wrong');
+      const l = window.matchState.left, r = window.matchState.right;
+      setTimeout(() => {
+        if (!l.disabled) l.style.borderColor = '';
+        if (!r.disabled) r.style.borderColor = '';
+      }, 400);
+    }
+    window.matchState.left = null; window.matchState.right = null;
   }
 };
 
 
 
-window.filterMyClassGroup = function() {
+window.filterMyClassGroup = function () {
   const filterVal = document.getElementById('my-class-filter').value;
   const searchVal = document.getElementById('student-search-input').value.toLowerCase();
   const grid = document.getElementById('students-grid');
-  
+
   const teacherClassesRaw = state.teacherProfile.classes || '';
   const teacherClasses = teacherClassesRaw.split(',').map(c => c.trim());
-  
+
   // 1. Filter by teacher's classes
   // 2. Filter by selected class dropdown
   // 3. Filter by search input
@@ -1176,7 +1372,7 @@ window.filterMyClassGroup = function() {
       </div>
     `;
   }).join('');
-  
+
   lucide.createIcons();
 }
 
@@ -1185,7 +1381,7 @@ window.filterMyClassGroup = function() {
  * Centralized for robust rendering and global accessibility
  */
 
-window.renderTeacherDashboard = function() {
+window.renderTeacherDashboard = function () {
   const teacherView = document.getElementById('teacher-view');
   if (!teacherView) return;
 
@@ -1300,7 +1496,7 @@ window.renderTeacherDashboard = function() {
   if (window.lucide) lucide.createIcons();
 };
 
-window.showMyDocuments = function() {
+window.showMyDocuments = function () {
   const content = document.getElementById('teacher-content');
   if (!content) {
     console.error("Teacher content container not found");
@@ -1313,7 +1509,7 @@ window.showMyDocuments = function() {
     <div class="animate-fade-in" style="padding: 1rem;">
       <div class="flex justify-between items-center mb-6">
         <h2 class="gradient-text" style="font-size: 2.2rem; font-weight: 800; margin: 0;">Менің құжаттарым</h2>
-        <button class="btn-secondary v-center" onclick="window.renderTeacherDashboard()" style="padding: 0.6rem 1.2rem; border-radius: 50px; cursor: pointer;">
+        <button class="btn-secondary v-center" onclick="navigate('teacher')" style="padding: 0.6rem 1.2rem; border-radius: 50px; cursor: pointer;">
           <i data-lucide="arrow-left" size="18" style="margin-right: 8px;"></i> Артқа
         </button>
       </div>
@@ -1351,10 +1547,10 @@ window.showMyDocuments = function() {
   if (window.lucide) lucide.createIcons();
 };
 
-window.handleDocumentUpload = function(e) {
+window.handleDocumentUpload = function (e) {
   const files = Array.from(e.target.files);
   let uploadedCount = 0;
-  
+
   files.forEach(file => {
     if (file.size > 2 * 1024 * 1024) {
       alert(`Файл "${file.name}" тым үлкен (макс 2МБ)`);
@@ -1383,7 +1579,7 @@ window.handleDocumentUpload = function(e) {
   });
 };
 
-window.deleteDocument = function(index) {
+window.deleteDocument = function (index) {
   if (confirm('Бұл құжатты өшіргіңіз келе ме?')) {
     state.teacherProfile.documents.splice(index, 1);
     saveState();
@@ -1409,7 +1605,7 @@ function formatBytes(bytes) {
 /**
  * Teacher Profile Edit Feature
  */
-window.showTeacherProfile = function(editMode = false) {
+window.showTeacherProfile = function (editMode = false) {
   const content = document.getElementById('teacher-content');
   if (!content) return;
 
@@ -1480,7 +1676,7 @@ window.showTeacherProfile = function(editMode = false) {
               </div>
               <div class="flex gap-4" style="margin-top: 1.5rem;">
                   <button class="btn-primary" style="flex: 1; padding: 1.1rem; border-radius: 14px;" onclick="window.saveTeacherProfile()"><i data-lucide="save" size="18"></i> Сақтау</button>
-                  <button class="btn-secondary" style="flex: 1; padding: 1.1rem; border-radius: 14px;" onclick="window.renderTeacherDashboard()">Болдырмау</button>
+                  <button class="btn-secondary" style="flex: 1; padding: 1.1rem; border-radius: 14px;" onclick="navigate('teacher')">Болдырмау</button>
               </div>
           </div>
       </div>
@@ -1501,7 +1697,7 @@ window.showTeacherProfile = function(editMode = false) {
   }
 };
 
-window.saveTeacherProfile = function() {
+window.saveTeacherProfile = function () {
   const p = state.teacherProfile;
   p.name = document.getElementById('edit-name').value;
   p.category = document.getElementById('edit-category').value;

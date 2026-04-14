@@ -9,7 +9,6 @@ function startTopic(id) {
   view.innerHTML = `
     <div class="flex flex-col gap-6 animate-fade-in">
       <div class="flex items-center gap-4">
-        <button class="btn-secondary" onclick="navigate('student')"><i data-lucide="arrow-left"></i> Қайту</button>
         <h2 class="voice-target">${topicName}</h2>
       </div>
       
@@ -113,7 +112,7 @@ function createStars() {
 let currentStudentChatId = null;
 
 function showStudentAIAssistant() {
-  const view = document.getElementById('student-view');
+  const view = document.getElementById('student-ai-view');
   
   if (!currentStudentChatId) {
     if (state.studentAIChats && state.studentAIChats.length > 0) {
@@ -128,9 +127,7 @@ function showStudentAIAssistant() {
   view.innerHTML = `
     <div class="flex flex-col animate-fade-in" style="height: 75vh; gap: 1.5rem;">
       <div class="flex justify-between items-center">
-        <button class="btn-secondary" onclick="navigate('student')" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;">
-          <i data-lucide="arrow-left" size="18"></i> Мәзір
-        </button>
+        <div></div>
         <div class="flex items-center" style="gap: 0.75rem;">
           <button class="btn-secondary v-center gap-2" onclick="showStudentAIHistory()" style="padding: 0.6rem 1.2rem; border-radius: 12px;">
             <i data-lucide="history" size="18"></i> Тарих
@@ -272,7 +269,7 @@ function showStudentAIHistory() {
   view.innerHTML = `
     <div class="flex flex-col animate-fade-in" style="height: 75vh; gap: 1.5rem;">
       <div class="flex justify-between items-center">
-        <button class="btn-secondary" onclick="showStudentAIAssistant()" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;">
+        <button class="btn-secondary" onclick="navigate('student-ai')" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;">
           <i data-lucide="arrow-left" size="18"></i> Чатқа қайту
         </button>
         <h2 class="gradient-text" style="font-size: 1.8rem; font-weight: 800;">Менің сұрақтарым</h2>
@@ -285,7 +282,7 @@ function showStudentAIHistory() {
             <p>Тарих бос...</p>
           </div>
         ` : sortedChats.map(chat => `
-          <div class="glass-panel voice-target" onclick="loadStudentAIChat(${chat.id})" 
+          <div class="glass-panel voice-target" onclick="navigate('student-ai'); loadStudentAIChat(${chat.id})" 
                style="padding: 1.5rem; border-radius: 16px; border: 1px solid var(--border-glass); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s;">
             <div class="flex items-center gap-4">
               <div style="width: 45px; height: 45px; border-radius: 12px; background: rgba(var(--accent-cyan-rgb), 0.1); color: var(--accent-cyan); display: flex; align-items: center; justify-content: center;">
