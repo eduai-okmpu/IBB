@@ -29,112 +29,206 @@
             align-items: center;
             justify-content: center;
             margin: 0 auto;
+            transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+            cursor: pointer;
+            filter: drop-shadow(0 0 50px rgba(57, 121, 181, 0.1));
+        }
+
+        .hero-animation:hover {
+            transform: scale(1.15) rotate(5deg);
+            filter: drop-shadow(0 0 80px rgba(32, 77, 118, 0.3));
         }
 
         .atom {
             position: relative;
             width: 200px;
             height: 200px;
+            perspective: 1500px;
+            transform-style: preserve-3d;
         }
 
         .nucleus {
-            width: 60px;
-            height: 60px;
-            background: radial-gradient(circle, #fff 0%, #3182CE 70%);
+            width: 66px;
+            height: 66px;
+            background: radial-gradient(circle at 30% 30%, #fff 0%, #f43f5e 40%, #881337 100%);
             border-radius: 50%;
-            box-shadow: 0 0 40px rgba(49, 130, 206, 0.4);
+            box-shadow:
+                0 0 30px rgba(244, 63, 94, 0.8),
+                0 0 60px rgba(244, 63, 94, 0.4),
+                inset -8px -8px 20px rgba(0, 0, 0, 0.6);
             position: absolute;
-            top: 70px;
-            left: 70px;
+            top: 67px;
+            left: 67px;
             z-index: 2;
+            animation: nucleusEnergy 4s ease-in-out infinite;
+        }
+
+        @keyframes nucleusEnergy {
+
+            0%,
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 30px rgba(244, 63, 94, 0.8), 0 0 60px rgba(244, 63, 94, 0.4);
+            }
+
+            50% {
+                transform: scale(1.1);
+                box-shadow: 0 0 50px rgba(244, 63, 94, 1), 0 0 100px rgba(244, 63, 94, 0.6);
+            }
         }
 
         .orbit {
             position: absolute;
-            border: 1.5px solid rgba(49, 130, 206, 0.15);
+            border: 1.5px solid rgba(255, 255, 255, 0.08);
             border-radius: 50%;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
+            transition: all 0.6s ease;
+            box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.02);
         }
 
+        /* Unique tilt for each orbit to create 3D sphere */
         .orbit-1 {
-            width: 320px;
-            height: 120px;
-            border-color: rgba(229, 62, 62, 0.3);
-            transform: translate(-50%, -50%) rotate(0deg);
-            animation: rotateOrbit1 4s linear infinite;
+            width: 360px;
+            height: 140px;
+            border-color: rgba(244, 63, 94, 0.2);
+            animation: rot1 8s linear infinite;
         }
 
         .orbit-2 {
-            width: 320px;
-            height: 120px;
-            border-color: rgba(49, 130, 206, 0.3);
-            transform: translate(-50%, -50%) rotate(120deg);
-            animation: rotateOrbit2 5s linear infinite;
+            width: 360px;
+            height: 140px;
+            border-color: rgba(59, 130, 246, 0.2);
+            animation: rot2 10s linear infinite;
         }
 
         .orbit-3 {
-            width: 320px;
-            height: 120px;
-            border-color: rgba(128, 90, 213, 0.3);
-            transform: translate(-50%, -50%) rotate(240deg);
-            animation: rotateOrbit3 6s linear infinite;
+            width: 360px;
+            height: 140px;
+            border-color: rgba(168, 85, 247, 0.2);
+            animation: rot3 12s linear infinite;
         }
 
-        @keyframes rotateOrbit1 {
+        .orbit-4 {
+            width: 360px;
+            height: 140px;
+            border-color: rgba(45, 212, 191, 0.2);
+            animation: rot4 14s linear infinite;
+        }
+
+        .orbit-5 {
+            width: 360px;
+            height: 140px;
+            border-color: rgba(251, 146, 60, 0.2);
+            animation: rot5 16s linear infinite;
+        }
+
+        .hero-animation:hover .orbit {
+            border-color: rgba(21, 19, 19, 0.3) !important;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+        }
+
+        /* Advanced 3D Rotations */
+        @keyframes rot1 {
             from {
-                transform: translate(-50%, -50%) rotate(0deg);
+                transform: translate(-50%, -50%) rotateX(60deg) rotateY(20deg) rotateZ(0deg);
             }
 
             to {
-                transform: translate(-50%, -50%) rotate(360deg);
+                transform: translate(-50%, -50%) rotateX(60deg) rotateY(20deg) rotateZ(360deg);
             }
         }
 
-        @keyframes rotateOrbit2 {
+        @keyframes rot2 {
             from {
-                transform: translate(-50%, -50%) rotate(120deg);
+                transform: translate(-50%, -50%) rotateX(60deg) rotateY(-20deg) rotateZ(72deg);
             }
 
             to {
-                transform: translate(-50%, -50%) rotate(480deg);
+                transform: translate(-50%, -50%) rotateX(60deg) rotateY(-20deg) rotateZ(432deg);
             }
         }
 
-        @keyframes rotateOrbit3 {
+        @keyframes rot3 {
             from {
-                transform: translate(-50%, -50%) rotate(240deg);
+                transform: translate(-50%, -50%) rotateX(30deg) rotateY(50deg) rotateZ(144deg);
             }
 
             to {
-                transform: translate(-50%, -50%) rotate(600deg);
+                transform: translate(-50%, -50%) rotateX(30deg) rotateY(50deg) rotateZ(504deg);
+            }
+        }
+
+        @keyframes rot4 {
+            from {
+                transform: translate(-50%, -50%) rotateX(30deg) rotateY(-50deg) rotateZ(216deg);
+            }
+
+            to {
+                transform: translate(-50%, -50%) rotateX(30deg) rotateY(-50deg) rotateZ(576deg);
+            }
+        }
+
+        @keyframes rot5 {
+            from {
+                transform: translate(-50%, -50%) rotateX(0deg) rotateY(0deg) rotateZ(288deg);
+            }
+
+            to {
+                transform: translate(-50%, -50%) rotateX(0deg) rotateY(0deg) rotateZ(648deg);
             }
         }
 
         .electron {
-            width: 12px;
-            height: 12px;
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
             position: absolute;
-            top: -6px;
+            top: -8px;
             left: 50%;
+            transform: translateX(-50%);
+            box-shadow: 0 0 25px currentColor;
+            z-index: 5;
+        }
+
+        /* Tail effect using multiple shadows */
+        .electron::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            filter: blur(4px);
+            box-shadow: -10px 0 15px currentColor, -20px 0 30px currentColor;
+            opacity: 0.6;
         }
 
         .orbit-1 .electron {
-            background: #E53E3E;
-            box-shadow: 0 0 15px #E53E3E;
+            background: #f43f5e;
+            color: #f43f5e;
         }
 
         .orbit-2 .electron {
-            background: #3182CE;
-            box-shadow: 0 0 15px #3182CE;
+            background: #3b82f6;
+            color: #3b82f6;
         }
 
         .orbit-3 .electron {
-            background: #805AD5;
-            box-shadow: 0 0 15px #805AD5;
+            background: #a855f7;
+            color: #a855f7;
         }
+
+        .orbit-4 .electron {
+            background: #2dd4bf;
+            color: #2dd4bf;
+        }
+
+        .orbit-5 .electron {
+            background: #fb923c;
+            color: #fb923c;
+        }
+
 
         /* Routing Views */
         .view {
@@ -177,7 +271,8 @@
         </button>
     </div>
 
-    <header class="container flex justify-between items-center" style="padding: 1rem 2rem; min-height: 80px; position: relative; z-index: 100;">
+    <header class="container flex justify-between items-center"
+        style="padding: 1rem 2rem; min-height: 80px; position: relative; z-index: 100;">
         <div class="flex items-center gap-4">
             <div class="logo flex items-center gap-4 cursor-pointer" onclick="navigateHome()">
                 <div
@@ -232,6 +327,12 @@
                             <div class="orbit orbit-3">
                                 <div class="electron"></div>
                             </div>
+                            <div class="orbit orbit-4">
+                                <div class="electron"></div>
+                            </div>
+                            <div class="orbit orbit-5">
+                                <div class="electron"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -254,6 +355,7 @@
                     <div class="ticker-fade ticker-fade-right"></div>
                     <div class="news-ticker" id="news-ticker">
                         <div class="news-ticker-track">
+                            <!-- Set 1 -->
                             <div class="news-card">
                                 <div class="news-card-icon"
                                     style="background: linear-gradient(135deg, #3182CE22, #3182CE44); border-color: #3182CE33;">
@@ -284,7 +386,47 @@
                                 <p>Оқу процесіне кедергі келтіретін ешқандай жасырын жарнамалар, қалқымалы терезелер
                                     немесе спам хабарламалар жоқ.</p>
                             </div>
-                            <!-- (rest of cards kept for ticker) -->
+                            <div class="news-card">
+                                <div class="news-card-icon"
+                                    style="background: linear-gradient(135deg, #D6990022, #D6990044); border-color: #D6990033;">
+                                    <i data-lucide="volume-2" style="color:#D69900;"></i>
+                                </div>
+                                <span class="news-card-tag">Қолжетімділік</span>
+                                <h4>Дыбыстық сүйемелдеу жүйесі</h4>
+                                <p>Сайттағы барлық мәтіндер, тапсырмалар мен түсіндірмелер автоматты түрде дауыстап
+                                    оқылады (Text-to-Speech).</p>
+                            </div>
+                            <!-- Set 2 (Duplicates for Seamless Loop) -->
+                            <div class="news-card">
+                                <div class="news-card-icon"
+                                    style="background: linear-gradient(135deg, #3182CE22, #3182CE44); border-color: #3182CE33;">
+                                    <i data-lucide="eye" style="color:#3182CE;"></i>
+                                </div>
+                                <span class="news-card-tag">Инклюзивтілік</span>
+                                <h4>ЕББҚ ететін балаларға арналған</h4>
+                                <p>Платформа көру қабілеті шектеулі балаларға толық бейімделген, жоғары контраст пен
+                                    үлкейтілген қаріптер қолданылады.</p>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon"
+                                    style="background: linear-gradient(135deg, #38A16922, #38A16944); border-color: #38A16933;">
+                                    <i data-lucide="shield-check" style="color:#38A169;"></i>
+                                </div>
+                                <span class="news-card-tag">Қауіпсіздік</span>
+                                <h4>100% Вируссыз және қауіпсіз орта</h4>
+                                <p>Сайт зиянды бағдарламалардан толықтай қорғалған, балалардың жеке деректері қатаң
+                                    сақталып, сыртқа таралмайды.</p>
+                            </div>
+                            <div class="news-card">
+                                <div class="news-card-icon"
+                                    style="background: linear-gradient(135deg, #E53E3E22, #E53E3E44); border-color: #E53E3E33;">
+                                    <i data-lucide="ban" style="color:#E53E3E;"></i>
+                                </div>
+                                <span class="news-card-tag">Жарнамасыз</span>
+                                <h4>Ешқандай жарнама жоқ</h4>
+                                <p>Оқу процесіне кедергі келтіретін ешқандай жасырын жарнамалар, қалқымалы терезелер
+                                    немесе спам хабарламалар жоқ.</p>
+                            </div>
                             <div class="news-card">
                                 <div class="news-card-icon"
                                     style="background: linear-gradient(135deg, #D6990022, #D6990044); border-color: #D6990033;">
@@ -388,9 +530,8 @@
         <div class="grid" style="grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 4rem; margin-bottom: 4rem;">
             <div>
                 <div class="logo flex items-center gap-4 mb-6">
-                    <div
-                        style="background: var(--primary-gradient); width: 32px; height: 32px; border-radius: 6px; flex-center">
-                        <i data-lucide="atom" style="color: white; width: 18px;"></i>
+                    <div style="background: var(--primary-gradient); width: 32px; height: 32px; border-radius: 6px;">
+                        <i data-lucide="atom" class="text-white" style="color: white; width: 18px;"></i>
                     </div>
                     <h3 style="font-weight: 700;">PhysicsAccess</h3>
                 </div>

@@ -735,7 +735,7 @@ body {
 .news-ticker-track {
   display: flex;
   width: max-content;
-  animation: tickerScroll 80s linear infinite;
+  animation: tickerScroll 40s linear infinite;
   padding: 1rem 0;
 }
 

@@ -153,7 +153,7 @@ function updateHeaderNav() {
   const isTeacher = state.user === 'teacher';
   const navLinks = isTeacher ? [
     { id: 'teacher', label: 'Басты бет', icon: 'layout' },
-    { id: 'teacher-class', label: 'Сыныптар', icon: 'users' },
+    { id: 'teacher-class', label: 'Оқушылар', icon: 'users' },
     { id: 'teacher-ai', label: 'AI Көмекші', icon: 'bot' },
     { id: 'labs', label: 'Зертхана', icon: 'flask-conical' }
   ] : [
