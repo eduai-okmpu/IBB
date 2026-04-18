@@ -70,6 +70,8 @@ function processAction(data) {
     return handleUpdateUser(data);
   } else if (action === 'chat') {
     return handleChat(data);
+  } else if (action === 'saveScore') {
+    return handleSaveScore(data);
   } else {
     return createResponse({ success: false, message: 'Invalid action: ' + action });
   }
@@ -303,7 +305,8 @@ function handleLogin(data) {
         success: true, 
         user: { 
           name: rows[i][0], 
-          role: rows[i][3] 
+          role: rows[i][3],
+          score: parseInt(rows[i][5]) || 0
         } 
       });
     }
@@ -315,4 +318,34 @@ function handleLogin(data) {
 function createResponse(data) {
   return ContentService.createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function handleSaveScore(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(USERS_SHEET_NAME);
+  if (!sheet) return createResponse({ success: false, message: 'Sheet not found' });
+
+  const email = String(data.email || '').toLowerCase();
+  const scoreToAdd = parseInt(data.scoreToAdd) || 0;
+  
+  if (!email) return createResponse({ success: false, message: 'email is required' });
+  
+  const dataRange = sheet.getDataRange();
+  const rows = dataRange.getValues();
+  
+  // Ensure header has Score
+  if (rows[0].length < 6 || rows[0][5] !== 'Score') {
+    sheet.getRange(1, 6).setValue('Score');
+  }
+
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][1]).toLowerCase() === email) {
+      let currentScore = parseInt(rows[i][5]) || 0;
+      let newScore = currentScore + scoreToAdd;
+      sheet.getRange(i + 1, 6).setValue(newScore);
+      return createResponse({ success: true, newScore: newScore });
+    }
+  }
+  
+  return createResponse({ success: false, message: 'Пайдаланушы табылмады' });
 }

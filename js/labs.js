@@ -11,18 +11,30 @@ function showLabDetails(id) {
   // Decide what to render in the main panel
   let simulationHtml = '';
   
-  if (lab.phetUrl) {
+  // Mapping of keys to their respective render functions defined in app.js
+  const labRenders = {
+    'freefall': typeof renderFreeFallLab === 'function' ? renderFreeFallLab : null,
+    'impulse': typeof renderImpulseLab === 'function' ? renderImpulseLab : null,
+    'hooke': typeof renderHookeLab === 'function' ? renderHookeLab : null,
+    'newton1': typeof renderNewton1Lab === 'function' ? renderNewton1Lab : null,
+    'newton2': typeof renderNewton2Lab === 'function' ? renderNewton2Lab : null,
+    'newton3': typeof renderNewton3Lab === 'function' ? renderNewton3Lab : null,
+    'gravity': typeof renderGravityLab === 'function' ? renderGravityLab : null,
+    'density': typeof renderDensityLab === 'function' ? renderDensityLab : null,
+    'pressure': typeof renderPressureLab === 'function' ? renderPressureLab : null,
+    'archimedes': typeof renderArchimedesLab === 'function' ? renderArchimedesLab : null
+  };
+
+  const renderFn = labRenders[lab.key];
+
+  if (renderFn) {
+    simulationHtml = renderFn();
+  } else if (lab.phetUrl) {
     simulationHtml = `
       <div class="glass-panel" style="height: 100%; padding: 0; overflow: hidden; border-radius: 20px; background: #000; position: relative; border: 1px solid var(--border-glass);">
         <iframe src="${lab.phetUrl}" style="width: 100%; height: 600px; border: none;" allowfullscreen></iframe>
       </div>
     `;
-  } else if (lab.key === 'freefall' && typeof renderFreeFallLab === 'function') {
-    simulationHtml = renderFreeFallLab();
-  } else if (lab.key === 'gravity' && typeof renderGravityLab === 'function') {
-    simulationHtml = renderGravityLab();
-  } else if (lab.key === 'archimedes' && typeof renderArchimedesLab === 'function') {
-    simulationHtml = renderArchimedesLab();
   } else {
     simulationHtml = `
       <div class="glass-panel flex-center flex-col gap-4 text-center" style="height: 100%; color: var(--text-tertiary); background: rgba(255,255,255,0.2); border: 2px dashed var(--border-glass);">

@@ -521,7 +521,22 @@
         <section id="student-view" class="view container"></section>
         <section id="student-ai-view" class="view container"></section>
         <section id="student-lessons-view" class="view container"></section>
+        <section id="student-lesson-play-view" class="view container"></section>
         <section id="labs-view" class="view container"></section>
+
+        <!-- Motivation Modal for Quizzes -->
+        <div id="motivation-modal" class="motivation-pop" style="display:none;">
+            <div id="motivation-icon" style="font-size: 4rem; margin-bottom: 1rem;">🌟</div>
+            <h2 id="motivation-text" style="font-size: 2.5rem; font-weight: 900; margin-bottom: 0.5rem;">Керемет!</h2>
+            <p id="motivation-subtext" style="color: var(--text-secondary); font-size: 1.2rem;">Сіз дұрыс жауап бердіңіз.</p>
+            <button class="btn-primary" style="margin-top: 2rem; width: 100%;" onclick="hideMotivation()">ЖАЛҒАСТЫРУ</button>
+        </div>
+
+        <!-- Sound Assets for Quizzes (Hidden) -->
+        <audio id="sound-success" src="https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3"></audio>
+        <audio id="sound-error" src="https://assets.mixkit.co/active_storage/sfx/2014/2014-preview.mp3"></audio>
+        <audio id="sound-complete" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3"></audio>
+
 
     </main>
 
@@ -718,12 +733,13 @@
     </button>
 
     <!-- Scripts -->
-    <script src="js/app.js?v=2.4"></script>
-    <script src="js/accessibility.js?v=2.4"></script>
-    <script src="js/teacher.js?v=2.4"></script>
-    <script src="js/student.js?v=2.4"></script>
-    <script src="js/labs.js?v=2.4"></script>
-    <script src="js/books.js?v=2.4"></script>
+    <script src="js/lessons_data.js?v=2.9"></script>
+    <script src="js/app.js?v=2.9"></script>
+    <script src="js/accessibility.js?v=2.9"></script>
+    <script src="js/teacher.js?v=2.9"></script>
+    <script src="js/student.js?v=2.9"></script>
+    <script src="js/labs.js?v=2.9"></script>
+    <script src="js/books.js?v=2.9"></script>
     <script>
         // Init Lucide Icons
         lucide.createIcons();
