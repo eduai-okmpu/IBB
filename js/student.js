@@ -109,31 +109,20 @@ function createStars() {
 }
 
 // Student AI Assistant Logic
-let currentStudentChatId = null;
+let studentChatMessages = [
+  { role: 'ai', text: 'Сәлем! Мен саған физиканы түсінуге көмектесемін. Формулалар, заңдар немесе есептер бойынша сұрақтарың болса, қоя бер!', time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }
+];
 
 function showStudentAIAssistant() {
   const view = document.getElementById('student-ai-view');
   
-  if (!currentStudentChatId) {
-    if (state.studentAIChats && state.studentAIChats.length > 0) {
-      currentStudentChatId = state.studentAIChats[state.studentAIChats.length - 1].id;
-    } else {
-      createNewStudentAIChat();
-    }
-  }
-
-  const chat = state.studentAIChats.find(c => c.id === currentStudentChatId) || state.studentAIChats[0];
-
   view.innerHTML = `
     <div class="flex flex-col animate-fade-in" style="height: 75vh; gap: 1.5rem;">
       <div class="flex justify-between items-center">
         <div></div>
         <div class="flex items-center" style="gap: 0.75rem;">
-          <button class="btn-secondary v-center gap-2" onclick="showStudentAIHistory()" style="padding: 0.6rem 1.2rem; border-radius: 12px;">
-            <i data-lucide="history" size="18"></i> Тарих
-          </button>
-          <button class="btn-primary v-center gap-2" onclick="createNewStudentAIChat()" style="padding: 0.6rem 1.2rem; border-radius: 12px;">
-            <i data-lucide="plus" size="18"></i> Жаңа чат
+          <button class="btn-primary v-center gap-2" onclick="clearStudentAIChat()" style="padding: 0.6rem 1.2rem; border-radius: 12px;">
+            <i data-lucide="refresh-cw" size="18"></i> Тазалау
           </button>
         </div>
       </div>
@@ -145,7 +134,7 @@ function showStudentAIAssistant() {
           </div>
           <div>
             <h3 style="font-size: 1.1rem; font-weight: 800;">Физика Көмекшісі</h3>
-            <p style="font-size: 0.8rem; color: var(--text-secondary);">${chat ? chat.title : 'Сұрақ қою'}</p>
+            <p style="font-size: 0.8rem; color: var(--text-secondary);">Сұрақ қою</p>
           </div>
         </div>
 
@@ -168,32 +157,21 @@ function showStudentAIAssistant() {
   `;
   
   renderStudentChatMessages();
-  lucide.createIcons();
+  if (window.lucide) lucide.createIcons();
 }
 
-function createNewStudentAIChat() {
-  const newChat = {
-    id: Date.now(),
-    title: 'Жаңа сұрақ',
-    messages: [
-      { role: 'ai', text: 'Сәлем! Мен саған физиканы түсінуге көмектесемін. Формулалар, заңдар немесе есептер бойынша сұрақтарың болса, қоя бер!', time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }
-    ],
-    lastUpdate: new Date()
-  };
-  if (!state.studentAIChats) state.studentAIChats = [];
-  state.studentAIChats.push(newChat);
-  currentStudentChatId = newChat.id;
-  showStudentAIAssistant();
+function clearStudentAIChat() {
+  studentChatMessages = [
+    { role: 'ai', text: 'Сәлем! Мен саған физиканы түсінуге көмектесемін. Формулалар, заңдар немесе есептер бойынша сұрақтарың болса, қоя бер!', time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }
+  ];
+  renderStudentChatMessages();
 }
 
 function renderStudentChatMessages() {
   const container = document.getElementById('student-chat-messages');
   if (!container) return;
   
-  const chat = state.studentAIChats.find(c => c.id === currentStudentChatId);
-  if (!chat) return;
-
-  container.innerHTML = chat.messages.map(msg => `
+  container.innerHTML = studentChatMessages.map(msg => `
     <div class="animate-scale-in" style="display: flex; flex-direction: column; align-items: ${msg.role === 'user' ? 'flex-end' : 'flex-start'}; gap: 0.3rem; max-width: 85%; align-self: ${msg.role === 'user' ? 'flex-end' : 'flex-start'};">
       <div style="padding: 1rem 1.2rem; border-radius: ${msg.role === 'user' ? '20px 20px 0 20px' : '20px 20px 20px 0'}; 
                   background: ${msg.role === 'user' ? 'var(--primary-gradient)' : '#fff'}; 
@@ -208,21 +186,13 @@ function renderStudentChatMessages() {
   container.scrollTop = container.scrollHeight;
 }
 
-function sendStudentAIMessage() {
+async function sendStudentAIMessage() {
   const input = document.getElementById('student-chat-input');
   const text = input.value.trim();
   if (!text) return;
 
-  const chat = state.studentAIChats.find(c => c.id === currentStudentChatId);
-  if (!chat) return;
-
   const userMsg = { role: 'user', text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
-  chat.messages.push(userMsg);
-  chat.lastUpdate = new Date();
-  
-  if (chat.title === 'Жаңа сұрақ') {
-    chat.title = text.length > 25 ? text.substring(0, 25) + '...' : text;
-  }
+  studentChatMessages.push(userMsg);
 
   input.value = '';
   renderStudentChatMessages();
@@ -239,71 +209,26 @@ function sendStudentAIMessage() {
   `);
   container.scrollTop = container.scrollHeight;
 
-  setTimeout(() => {
+  try {
+    const result = await window.callAI(text);
+    
     const typingElem = document.getElementById(typingId);
     if (typingElem) typingElem.remove();
 
-    let aiText = `Керемет сұрақ! "${text}" туралы саған қарапайым тілмен түсіндіріп көрейін. `;
-    if (text.toLowerCase().includes('формула')) {
-      aiText += `\n\nНегізгі формулалар:\n- Күш: $F = m \cdot a$\n- Жылдамдық: $v = S / t$\n- Энергия: $E = mc^2$`;
-    } else if (text.toLowerCase().includes('ньютон')) {
-      aiText += `\n\nНьютонның 3 заңы бар:\n1. Инерция заңы.\n2. $F = ma$.\n3. Әсер етуші күш қарсы әсер етуші күшке тең.`;
+    if (result.success) {
+      const aiMsg = { role: 'ai', text: result.text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+      studentChatMessages.push(aiMsg);
+      
+      renderStudentChatMessages();
+      if (typeof speak === 'function') speak("Жаңа жауап келді.");
     } else {
-      aiText += `\n\nБұл тақырыпты тереңірек білгің келсе, сабақтар бөліміндегі видеоны көр немесе зертханада тәжірибе жасап көр!`;
+      alert("AI қатесі: " + result.message);
     }
-
-    const aiMsg = { role: 'ai', text: aiText, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
-    chat.messages.push(aiMsg);
-    chat.lastUpdate = new Date();
-    
-    renderStudentChatMessages();
-    if (typeof speak === 'function') speak("Жаңа жауап келді.");
-    lucide.createIcons();
-  }, 1800);
-}
-
-function showStudentAIHistory() {
-  const view = document.getElementById('student-view');
-  const sortedChats = [...(state.studentAIChats || [])].sort((a, b) => new Date(b.lastUpdate) - new Date(a.lastUpdate));
-
-  view.innerHTML = `
-    <div class="flex flex-col animate-fade-in" style="height: 75vh; gap: 1.5rem;">
-      <div class="flex justify-between items-center">
-        <button class="btn-secondary" onclick="navigate('student-ai')" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;">
-          <i data-lucide="arrow-left" size="18"></i> Чатқа қайту
-        </button>
-        <h2 class="gradient-text" style="font-size: 1.8rem; font-weight: 800;">Менің сұрақтарым</h2>
-      </div>
-
-      <div class="glass-card flex flex-col gap-3" style="flex: 1; padding: 1.5rem; overflow-y: auto;">
-        ${sortedChats.length === 0 ? `
-          <div class="flex-center flex-col gap-4" style="height: 100%; opacity: 0.5;">
-            <i data-lucide="message-square-off" size="64"></i>
-            <p>Тарих бос...</p>
-          </div>
-        ` : sortedChats.map(chat => `
-          <div class="glass-panel voice-target" onclick="navigate('student-ai'); loadStudentAIChat(${chat.id})" 
-               style="padding: 1.5rem; border-radius: 16px; border: 1px solid var(--border-glass); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s;">
-            <div class="flex items-center gap-4">
-              <div style="width: 45px; height: 45px; border-radius: 12px; background: rgba(var(--accent-cyan-rgb), 0.1); color: var(--accent-cyan); display: flex; align-items: center; justify-content: center;">
-                <i data-lucide="help-circle" size="24"></i>
-              </div>
-              <div>
-                <h4 style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.2rem;">${chat.title}</h4>
-                <p style="font-size: 0.8rem; color: var(--text-tertiary);">${chat.messages.length} хабарлама • ${new Date(chat.lastUpdate).toLocaleDateString()}</p>
-              </div>
-            </div>
-            <i data-lucide="chevron-right" size="20" style="color: var(--text-tertiary);"></i>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `;
-  lucide.createIcons();
-}
-
-function loadStudentAIChat(id) {
-  currentStudentChatId = id;
-  showStudentAIAssistant();
+  } catch (error) {
+    const typingElem = document.getElementById(typingId);
+    if (typingElem) typingElem.remove();
+    alert("Байланыс қатесі");
+  }
+  if (window.lucide) lucide.createIcons();
 }
 

@@ -26,8 +26,6 @@ const defaultState = {
     certificates: [], // {name, dataUrl}
     documents: []
   },
-  teacherAIChats: [], // Array of { id, title, messages: [], lastUpdate }
-  studentAIChats: [], // Array of { id, title, messages: [], lastUpdate }
   studentProfile: {
     id: Date.now(),
     name: '',
@@ -41,7 +39,6 @@ const defaultState = {
   quizResults: [],
   allStudents: [],
   chatMessages: [],
-  aiHistory: { teacher: [], student: [] },
   currentTeacherChatStudentId: null
 };
 
@@ -60,7 +57,6 @@ function saveState() {
     quizResults: state.quizResults,
     allStudents: state.allStudents,
     chatMessages: state.chatMessages,
-    aiHistory: state.aiHistory,
     currentTeacherChatStudentId: state.currentTeacherChatStudentId
   }));
 }
@@ -71,7 +67,6 @@ window.addEventListener('storage', (e) => {
     const newState = JSON.parse(e.newValue);
     if (newState && newState.chatMessages) {
       state.chatMessages = newState.chatMessages;
-      state.aiHistory = newState.aiHistory;
       state.currentTeacherChatStudentId = newState.currentTeacherChatStudentId;
 
       // Refresh current view if it's a chat
@@ -121,9 +116,15 @@ function navigate(viewId, pushToHistory = true) {
     if (viewId === 'teacher' && state.user === 'teacher') window.renderTeacherDashboard();
     if (viewId === 'student' && state.user === 'student') renderStudentDashboard();
     if (viewId === 'student-lessons' && state.user === 'student') window.showStudentLessons('student-lessons-view', "navigate('student')");
-    if (viewId === 'student-ai' && state.user === 'student') window.showStudentAIAssistant();
-    if (viewId === 'teacher-class' && state.user === 'teacher') window.showClassManager();
-    if (viewId === 'teacher-ai' && state.user === 'teacher') window.showAIAssistant();
+    if (viewId === 'student-ai' && state.user === 'student') {
+        window.showStudentAIAssistant();
+    }
+    if (viewId === 'teacher-ai' && state.user === 'teacher') {
+        window.showAIAssistant();
+    }
+    if (viewId === 'teacher-class' && state.user === 'teacher') {
+        window.showClassManager();
+    }
   }
 
   // Handle calculator visibility
@@ -198,6 +199,23 @@ function goBack() {
 
 const GOOGLE_SCRIPTS_AUTH_URL = 'https://script.google.com/macros/s/AKfycbzsHO8t7TM04Sohp6Lq6nuYzLoSvJOHy_fI4MA0wW7qv6tUxUkwpzUHXVpcmrNMtc_zfg/exec';
 
+window.callAI = async function (text) {
+  const email = state.user === 'teacher' ? (state.teacherProfile.email || 'teacher@demo.com') : (state.studentProfile.email || 'student@demo.com');
+
+  try {
+    const params = new URLSearchParams({
+      action: 'chat',
+      email: email,
+      text: text
+    });
+    const response = await fetch(`${GOOGLE_SCRIPTS_AUTH_URL}?${params.toString()}`);
+    return await response.json();
+  } catch (error) {
+    console.error('AI API Error:', error);
+    return { success: false, message: error.message };
+  }
+};
+
 window.openAuthModal = function (mode = 'login') {
   const modal = document.getElementById('auth-modal');
   if (modal) {
@@ -222,23 +240,22 @@ window.toggleAuthMode = function (mode) {
 
 window.handleAuthSubmit = async function (mode) {
   const loading = document.getElementById('auth-loading');
+  const emailVal = document.getElementById(mode === 'login' ? 'login-email' : 'reg-email').value;
   let params = new URLSearchParams({ action: mode });
 
   if (mode === 'login') {
-    const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
-    if (!email || !password) return alert('Мәліметтерді толтырыңыз');
-    params.append('email', email);
+    if (!emailVal || !password) return alert('Мәліметтерді толтырыңыз');
+    params.append('email', emailVal);
     params.append('password', password);
   } else {
     const name = document.getElementById('reg-name').value;
     const role = document.getElementById('reg-role').value;
-    const email = document.getElementById('reg-email').value;
     const password = document.getElementById('reg-password').value;
-    if (!name || !email || !password) return alert('Барлық өрістерді толтырыңыз');
+    if (!name || !emailVal || !password) return alert('Барлық өрістерді толтырыңыз');
     params.append('name', name);
     params.append('role', role);
-    params.append('email', email);
+    params.append('email', emailVal);
     params.append('password', password);
   }
 
@@ -251,14 +268,19 @@ window.handleAuthSubmit = async function (mode) {
 
     if (result.success) {
       state.user = result.user.role;
-      // Set name from result, or fallback to email prefix if "Вы" or empty
       let name = result.user.name;
       if (!name || name === 'Вы') {
-        const emailInput = mode === 'login' ? document.getElementById('login-email') : document.getElementById('reg-email');
-        name = (emailInput && emailInput.value) ? emailInput.value.split('@')[0] : 'User';
+        name = emailVal ? emailVal.split('@')[0] : 'User';
       }
       state.studentProfile.name = name;
       state.teacherProfile.name = name;
+      
+      // Save email to state for AI history
+      if (state.user === 'teacher') {
+        state.teacherProfile.email = emailVal;
+      } else {
+        state.studentProfile.email = emailVal;
+      }
 
       login(result.user.role);
       closeAuthModal();
@@ -267,13 +289,9 @@ window.handleAuthSubmit = async function (mode) {
     }
   } catch (error) {
     console.error('Auth Error:', error);
-    // FALLBACK for development if API is not yet published correctly
-    const emailField = mode === 'login' ? 'login-email' : 'reg-email';
-    const emailVal = document.getElementById(emailField).value;
-
     if (emailVal === 'teacher@demo.com') login('teacher');
     else if (emailVal === 'student@demo.com') login('student');
-    else alert('API байланыс қатесі. Скриптті ДЕПЛОЙ жасап, "Anyone" рұқсатын бергеніңізді тексеріңіз.');
+    else alert('API байланыс қатесі.');
   } finally {
     if (loading) loading.style.display = 'none';
   }
@@ -281,7 +299,7 @@ window.handleAuthSubmit = async function (mode) {
 
 function login(role) {
   state.user = role;
-  state.history = ['home', role]; // Set baseline history
+  state.history = ['home', role];
   saveState();
   navigate(role, false);
 }
@@ -289,6 +307,11 @@ function login(role) {
 function logout() {
   state.user = null;
   state.history = ['home'];
+  
+  // Clear AI chat sessions
+  if (window.clearStudentAIChat) window.clearStudentAIChat();
+  if (window.clearTeacherAIChat) window.clearTeacherAIChat();
+  
   saveState();
   navigate('home', false);
 }

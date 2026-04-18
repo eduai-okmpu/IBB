@@ -2,7 +2,7 @@
  * PhysicsAccess - Book Fetching and Rendering
  */
 
-window.showResourceLibrary = async function(containerId = 'student-content', backFnName = 'renderStudentDashboard') {
+window.showResourceLibrary = async function (containerId = 'student-content', backFnName = 'renderStudentDashboard') {
   const content = document.getElementById(containerId) || document.getElementById('student-view');
   if (!content) return;
 
@@ -69,3 +69,4 @@ window.showResourceLibrary = async function(containerId = 'student-content', bac
   `;
   if (window.lucide) lucide.createIcons();
 };
+

@@ -2,22 +2,14 @@
  * PhysicsAccess - Teacher Logic (Premium UI & 120 Questions)
  */
 
-let currentTeacherChatId = null;
+// Teacher AI Assistant Logic
+let teacherChatMessages = [
+  { role: 'ai', text: 'Сәлеметсіз бе! Мен сіздің AI көмекшіңізбін. Сабақ жоспарын құруға, есептер шығаруға немесе физикадан кез келген сұраққа жауап беруге дайынмын.', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+];
 
 window.showAIAssistant = function () {
   const content = document.getElementById('teacher-ai-view');
   if (!content) return;
-
-  // If no chat selected, create or pick latest
-  if (!currentTeacherChatId) {
-    if (state.teacherAIChats.length > 0) {
-      currentTeacherChatId = state.teacherAIChats[state.teacherAIChats.length - 1].id;
-    } else {
-      window.createNewTeacherAIChat();
-    }
-  }
-
-  const chat = state.teacherAIChats.find(c => c.id === currentTeacherChatId) || state.teacherAIChats[0];
 
   content.innerHTML = `
     <div class="flex flex-col animate-fade-in" style="height: 85vh; gap: 1.5rem; padding: 2rem 0;">
@@ -26,11 +18,8 @@ window.showAIAssistant = function () {
           <i data-lucide="arrow-left" size="18"></i> Басты бетке қайту
         </button>
         <div class="flex items-center" style="gap: 0.75rem;">
-          <button class="btn-secondary v-center gap-2" onclick="window.showTeacherAIHistory()" style="padding: 0.6rem 1.2rem; border-radius: 12px;">
-            <i data-lucide="history" size="18"></i> Тарих
-          </button>
-          <button class="btn-primary v-center gap-2" onclick="window.createNewTeacherAIChat()" style="padding: 0.6rem 1.2rem; border-radius: 12px;">
-            <i data-lucide="plus" size="18"></i> Жаңа чат
+          <button class="btn-primary v-center gap-2" onclick="window.clearTeacherAIChat()" style="padding: 0.6rem 1.2rem; border-radius: 12px;">
+            <i data-lucide="refresh-cw" size="18"></i> Тазалау
           </button>
         </div>
       </div>
@@ -43,13 +32,13 @@ window.showAIAssistant = function () {
           </div>
           <div>
             <h3 style="font-size: 1.1rem; font-weight: 800;">AI Көмекші</h3>
-            <p style="font-size: 0.8rem; color: var(--text-secondary);">${chat ? chat.title : 'Жаңа сөйлесу'}</p>
+            <p style="font-size: 0.8rem; color: var(--text-secondary);">Сұрақ қою</p>
           </div>
         </div>
 
         <!-- Chat Messages -->
         <div id="teacher-chat-messages" style="flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; background: rgba(255,255,255,0.1);">
-          <!-- Messages will be rendered here -->
+          <!-- Messages -->
         </div>
 
         <div class="chat-input-wrapper" style="padding: 1.2rem; border-top: 1px solid var(--border-glass); background: #fff;">
@@ -66,32 +55,22 @@ window.showAIAssistant = function () {
     </div>
   `;
 
-  if (window.renderTeacherChatMessages) window.renderTeacherChatMessages();
+  window.renderTeacherChatMessages();
   if (window.lucide) lucide.createIcons();
 }
 
-window.createNewTeacherAIChat = function () {
-  const newChat = {
-    id: Date.now(),
-    title: 'Жаңа сөйлесу',
-    messages: [
-      { role: 'ai', text: 'Сәлеметсіз бе! Мен сіздің AI көмекшіңізбін. Сабақ жоспарын құруға, есептер шығаруға немесе физикадан кез келген сұраққа жауап беруге дайынмын.', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
-    ],
-    lastUpdate: new Date()
-  };
-  state.teacherAIChats.push(newChat);
-  currentTeacherChatId = newChat.id;
-  window.showAIAssistant();
+window.clearTeacherAIChat = function () {
+  teacherChatMessages = [
+    { role: 'ai', text: 'Сәлеметсіз бе! Мен сіздің AI көмекшіңізбін. Сабақ жоспарын құруға, есептер шығаруға немесе физикадан кез келген сұраққа жауап беруге дайынмын.', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+  ];
+  window.renderTeacherChatMessages();
 }
 
 window.renderTeacherChatMessages = function () {
   const container = document.getElementById('teacher-chat-messages');
   if (!container) return;
 
-  const chat = state.teacherAIChats.find(c => c.id === currentTeacherChatId);
-  if (!chat) return;
-
-  container.innerHTML = chat.messages.map(msg => `
+  container.innerHTML = teacherChatMessages.map(msg => `
     <div class="animate-scale-in" style="display: flex; flex-direction: column; align-items: ${msg.role === 'user' ? 'flex-end' : 'flex-start'}; gap: 0.3rem; max-width: 85%; align-self: ${msg.role === 'user' ? 'flex-end' : 'flex-start'};">
       <div style="padding: 1rem 1.2rem; border-radius: ${msg.role === 'user' ? '20px 20px 0 20px' : '20px 20px 20px 0'}; 
                   background: ${msg.role === 'user' ? 'var(--primary-gradient)' : '#fff'}; 
@@ -106,30 +85,19 @@ window.renderTeacherChatMessages = function () {
   container.scrollTop = container.scrollHeight;
 }
 
-window.sendTeacherAIMessage = function () {
+window.sendTeacherAIMessage = async function () {
   const input = document.getElementById('teacher-chat-input');
   if (!input) return;
   const text = input.value.trim();
   if (!text) return;
 
-  const chat = state.teacherAIChats.find(c => c.id === currentTeacherChatId);
-  if (!chat) return;
-
-  // Add User Message
   const userMsg = { role: 'user', text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-  chat.messages.push(userMsg);
-  chat.lastUpdate = new Date();
-
-  // Set title based on first user message if it's still "New Chat"
-  if (chat.title === 'Жаңа сөйлесу') {
-    chat.title = text.length > 25 ? text.substring(0, 25) + '...' : text;
-  }
+  teacherChatMessages.push(userMsg);
 
   input.value = '';
   window.renderTeacherChatMessages();
   if (window.playSound) window.playSound('correct');
 
-  // AI Typing indicator
   const container = document.getElementById('teacher-chat-messages');
   const typingId = 'typing-' + Date.now();
   const typingHtml = `
@@ -142,74 +110,27 @@ window.sendTeacherAIMessage = function () {
   container.insertAdjacentHTML('beforeend', typingHtml);
   container.scrollTop = container.scrollHeight;
 
-  // Simulate AI Response
-  setTimeout(() => {
+  try {
+    const result = await window.callAI(text);
+    
     const typingElem = document.getElementById(typingId);
     if (typingElem) typingElem.remove();
 
-    let aiText = `Сіздің "${text}" туралы сұранысыңыз бойынша материал дайындадым. `;
-    if (text.toLowerCase().includes('ө жоспар') || text.toLowerCase().includes('сабақ')) {
-      aiText += `\n\n**Сабақ жоспары: ${text}**\n1. Ұйымдастыру кезеңі (5 мин)\n2. Өткен тақырыпты қайталау (10 мин)\n3. Жаңа материалды түсіндіру (20 мин)\n4. Есептер шығару (10 мин)\n5. Қорытынды.`;
+    if (result.success) {
+      const aiMsg = { role: 'ai', text: result.text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+      teacherChatMessages.push(aiMsg);
+
+      window.renderTeacherChatMessages();
+      if (window.speakText) window.speakText("Жаңа хабарлама келді.");
     } else {
-      aiText += `\n\nБұл тақырып бойынша қосымша мәліметтер керек болса немесе есеп шығару қажет болса, хабарласыңыз. Мен сізге көмектесуге әрқашан дайынмын.`;
+      alert("AI қатесі: " + result.message);
     }
-
-    const aiMsg = { role: 'ai', text: aiText, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-    chat.messages.push(aiMsg);
-    chat.lastUpdate = new Date();
-
-    window.renderTeacherChatMessages();
-    if (window.speakText) window.speakText("Жаңа хабарлама келді.");
-    if (window.lucide) lucide.createIcons();
-  }, 1800);
-}
-
-window.showTeacherAIHistory = function () {
-  const content = document.getElementById('teacher-ai-view');
-  if (!content) return;
-
-  const sortedChats = [...state.teacherAIChats].sort((a, b) => new Date(b.lastUpdate) - new Date(a.lastUpdate));
-
-  content.innerHTML = `
-    <div class="flex flex-col animate-fade-in" style="height: 75vh; gap: 1.5rem;">
-      <div class="flex justify-between items-center">
-        <button class="btn-secondary voice-target" onclick="window.showAIAssistant()" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;">
-          <i data-lucide="arrow-left" size="18"></i> Чатқа қайту
-        </button>
-        <h2 class="gradient-text" style="font-size: 1.8rem; font-weight: 800;">Сұраныстар тарихы</h2>
-      </div>
-
-      <div class="glass-card flex flex-col gap-3" style="flex: 1; padding: 1.5rem; overflow-y: auto;">
-        ${sortedChats.length === 0 ? `
-          <div class="flex-center flex-col gap-4" style="height: 100%; opacity: 0.5;">
-            <i data-lucide="message-square-off" size="64"></i>
-            <p>Тарих бос...</p>
-          </div>
-        ` : sortedChats.map(chat => `
-          <div class="glass-panel voice-target" onclick="window.loadTeacherAIChat(${chat.id})" 
-               style="padding: 1.5rem; border-radius: 16px; border: 1px solid var(--border-glass); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s;">
-            <div class="flex items-center gap-4">
-              <div style="width: 45px; height: 45px; border-radius: 12px; background: rgba(242, 109, 33, 0.1); color: var(--accent-orange); display: flex; align-items: center; justify-content: center;">
-                <i data-lucide="message-circle" size="24"></i>
-              </div>
-              <div>
-                <h4 style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.2rem;">${chat.title}</h4>
-                <p style="font-size: 0.8rem; color: var(--text-tertiary);">${chat.messages.length} хабарлама • ${new Date(chat.lastUpdate).toLocaleDateString()}</p>
-              </div>
-            </div>
-            <i data-lucide="chevron-right" size="20" style="color: var(--text-tertiary);"></i>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `;
-
+  } catch (error) {
+    const typingElem = document.getElementById(typingId);
+    if (typingElem) typingElem.remove();
+    alert("Байланыс қатесі");
+  }
   if (window.lucide) lucide.createIcons();
-}
-
-window.loadTeacherAIChat = function (id) {
-  currentTeacherChatId = id;
-  window.showAIAssistant();
 }
 
 
