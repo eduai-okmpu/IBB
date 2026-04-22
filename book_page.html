@@ -21,6 +21,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
   <script data-ad-client="ca-pub-7955867262490118" async
     src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
   <!-- <script async custom-element="amp-ad" src="https://cdn.ampproject.org/v0/amp-ad-0.1.js"></script> -->
@@ -617,7 +618,7 @@
   <script src="https://yandex.ru/ads/system/context.js" async></script>
 </head>
 
-<body>
+<body data-theme="default" data-size="medium">
   <div class="wrapper">
     <header>
       <div class="container">
@@ -1187,6 +1188,27 @@ window.yaContextCb.push(() => {
     }
   </script>
 
+    <!-- Accessibility Tools -->
+    <div class="a11y-panel" id="a11y-panel">
+        <button id="toggle-a11y-menu" class="a11y-btn main-toggle" title="Баптаулар" aria-label="Баптаулар мәзірін ашу">
+            <i data-lucide="settings"></i>
+        </button>
+        <button id="toggle-contrast" class="a11y-btn" title="Жоғары контраст режимі"
+            aria-label="Жоғары контраст режимі">
+            <i data-lucide="contrast"></i>
+        </button>
+        <button id="increase-font" class="a11y-btn" title="Мәтінді үлкейту" aria-label="Мәтінді үлкейту">
+            <i data-lucide="type"></i>
+            <span class="size-level"
+                style="font-size: 10px; font-weight: 800; position: absolute; bottom: 8px; right: 8px;">A</span>
+        </button>
+    </div>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="js/accessibility.js"></script>
+    <script>
+        if (window.lucide) lucide.createIcons();
+    </script>
 </body>
 
 </html>

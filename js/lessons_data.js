@@ -1,3 +1,56 @@
+const SHOP_CATALOG = {
+  avatars: [
+    { id: 'einstein', name: 'Альберт Эйнштейн', price: 75, icon: 'brain-circuit', image: 'assets/avatars/einstein.png', desc: 'Теориялық физиканың атасы', bgColor: 'linear-gradient(135deg, #818cf8, #4f46e5)', color: '#fff' },
+    { id: 'newton', name: 'Исаак Ньютон', price: 75, icon: 'apple', image: 'assets/avatars/newton.png', desc: 'Классикалық механиканың негізін салушы', bgColor: 'linear-gradient(135deg, #4ade80, #16a34a)', color: '#fff' },
+    { id: 'curie', name: 'Мария Кюри', price: 75, icon: 'flask-conical', image: 'assets/avatars/curie.png', desc: 'Радиоактивтілікті зерттеуші', bgColor: 'linear-gradient(135deg, #2dd4bf, #0d9488)', color: '#fff' },
+    { id: 'tesla', name: 'Никола Тесла', price: 75, icon: 'zap', image: 'assets/avatars/tesla.png', desc: 'Электр және магнетизм шебері', bgColor: 'linear-gradient(135deg, #fbbf24, #d97706)', color: '#fff' },
+    { id: 'galileo', name: 'Галилео Галилей', price: 75, icon: 'telescope', image: 'assets/avatars/galileo.png', desc: 'Заманауи астрономияның әкесі', bgColor: 'linear-gradient(135deg, #60a5fa, #2563eb)', color: '#fff' }
+  ],
+  frames: [
+    { id: 'science', name: 'Ғылыми ұшқын', price: 50, style: 'border: 3px dashed #f26d21;', desc: 'Экспериментатор стилі' },
+    { id: 'plasma', name: 'Плазмалық өріс', price: 100, style: 'border: 3px solid #a855f7; box-shadow: 0 0 10px #a855f7;', desc: 'Фиолетті энергия' },
+    { id: 'neon', name: 'Неонды жарқыл', price: 150, style: 'border: 3px solid #00f3ff; box-shadow: 0 0 15px #00f3ff;', desc: 'Стильді кибер-эффект' },
+    { id: 'gold', name: 'Алтын лига', price: 250, style: 'border: 3px solid #ffd700; box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);', desc: 'Ең үздік физиктер үшін' }
+  ],
+  titles: [
+    { 
+      id: 'title_physics_fan', 
+      name: 'Физика жанкүйері', 
+      price: 25, 
+      desc: 'Алғашқы қадамдар',
+      style: 'background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid #fcd34d; color: #92400e; box-shadow: 0 2px 8px rgba(251, 191, 36, 0.15);'
+    },
+    { 
+      id: 'title_lab_king', 
+      name: 'Лаборатория патшасы', 
+      price: 125, 
+      desc: 'Тәжірибелер шебері',
+      style: 'background: linear-gradient(135deg, #fff7ed, #ffedd5); border: 1px solid #fdba74; color: #9a3412; box-shadow: 0 2px 8px rgba(249, 115, 22, 0.15);'
+    },
+    { 
+      id: 'title_einstein_pupil', 
+      name: 'Эйнштейннің шәкірті', 
+      price: 250, 
+      desc: 'Ең жоғарғы мәртебе',
+      style: 'background: linear-gradient(135deg, #fffcf0, #fef9c3); border: 1px solid #facc15; color: #854d0e; box-shadow: 0 2px 8px rgba(234, 179, 8, 0.15);'
+    },
+    { 
+      id: 'title_quantum_expert', 
+      name: 'Кванттық сарапшы', 
+      price: 350, 
+      desc: 'Микроәлем құпияларын меңгерген',
+      style: 'background: linear-gradient(135deg, #ecfeff, #cffafe); border: 1px solid #22d3ee; color: #0891b2; box-shadow: 0 2px 8px rgba(6, 182, 212, 0.15);'
+    },
+    { 
+      id: 'title_cosmic_explorer', 
+      name: 'Ғарыш зерттеушісі', 
+      price: 500, 
+      desc: 'Жұлдыздар мен галактикалар шебері',
+      style: 'background: linear-gradient(135deg, #f5f3ff, #ede9fe); border: 1px solid #a78bfa; color: #7c3aed; box-shadow: 0 2px 8px rgba(139, 92, 246, 0.15);'
+    }
+  ]
+};
+
 /**
  * PhysicsAccess - Lessons Data
  * Contains 10 physics topics with theory, quiz, lab and game data.
@@ -40,7 +93,7 @@ const allLessonsData = [
 
       <p><b>Қызықты факт:</b> Ай бетінде еркін түсу үдеуі әлдеқайда аз (≈1.6 м/с²), сондықтан ол жақта денелер баяу түседі және адамдар жоғарырақ секіре алады.</p>
     `,
-    videoId: "B8yVqf_K71c",
+    videoId: "7ErQzJ6eLNw",
     quiz: [
       { q: "Еркін түсу кезінде дененің үдеуі (g) оның массасына тәуелді ме?", a: ["Иә, масса артса үдеу де артады", "Иә, ауыр денелер тезірек түседі", "Жоқ, үдеу массаға тәуелсіз", "Тек вакуумда тәуелді"], c: 2 },
       { q: "Галилео Галилей өзінің әйгілі тәжірибелерін қайда өткізді?", a: ["Эйфель мұнарасында", "Пиза мұнарасында", "Үлкен каньонда", "Ай бетінде"], c: 1 },
@@ -51,6 +104,17 @@ const allLessonsData = [
     labVerification: {
       instruction: "Виртуалды зертхананы қолданып, жүкті 20 метр биіктіктен тастаңыз. Оның түсу уақытын дәл өлшеп, соңғы жылдамдығын (v = gt) есептеңіз. (g=9.8 қолданыңыз).",
       correctAnswer: "19.6"
+    },
+    customGame: 'maze',
+    gameContent: {
+      type: 'matching',
+      items: [
+        { term: 'g', def: '9.8 м/с²' },
+        { term: 'h', def: 'Биіктік' },
+        { term: 'v', def: 'Жылдамдық' },
+        { term: 't', def: 'Уақыт' },
+        { term: 'Вакуум', def: 'Ауасыз кеңістік' }
+      ]
     }
   },
   {
@@ -75,7 +139,7 @@ const allLessonsData = [
       <h3>Реактивті қозғалыс:</h3>
       <p>Денеден оның бір бөлігі белгілі бір жылдамдықпен бөлініп шыққан кезде пайда болатын қозғалыс. Мысалы, зымыран астынан газдарды үлкен жылдамдықпен шығарады, ал зымыранның өзі кері бағытта жоғары қарай импульс алады.</p>
     `,
-    videoId: "D0fC59Y0M0o",
+    videoId: "s9zbmnbwMw4",
     quiz: [
       { q: "Массасы 2 кг дене 5 м/с жылдамдықпен қозғалса, оның импульсі қандай?", a: ["2.5 кг·м/с", "7 кг·м/с", "10 кг·м/с", "25 кг·м/с"], c: 2 },
       { q: "Импульс қандай шама болып табылады?", a: ["Скаляр", "Тұрақты", "Векторлық", "Белгісіз"], c: 2 },
@@ -86,6 +150,10 @@ const allLessonsData = [
     labVerification: {
       instruction: "Импульстің сақталуын тексеріңіз. Массасы 100 кг снарядты 500 м/с жылдамдықпен атсақ, ол қандай импульс береді?",
       correctAnswer: "50000"
+    },
+    gameContent: {
+      type: 'scramble',
+      words: ["ИМПУЛЬС", "МАССА", "ЖЫЛДАМДЫҚ", "ВЕКТОР"]
     }
   },
   {
@@ -118,7 +186,7 @@ const allLessonsData = [
         <li><b>Иілу</b> (көпірлер)</li>
       </ul>
     `,
-    videoId: "mD7aYI-m2Uo",
+    videoId: "-bHiRt4XWP4",
     quiz: [
       { q: "Деформация кезінде пайда болатын күш қалай аталады?", a: ["Ауырлық күші", "Серпімділік күші", "Үйкеліс күші", "Қысым күші"], c: 1 },
       { q: "Гук заңындағы 'k' әрпі нені білдіреді?", a: ["Күш", "Ұзару", "Қатаңдық", "Үдеу"], c: 2 },
@@ -129,6 +197,16 @@ const allLessonsData = [
     labVerification: {
       instruction: "Қатаңдығы 400 Н/м серіппені 5 см-ге (0.05 м) созғанда пайда болатын серпімділік күшін табыңыз.",
       correctAnswer: "20"
+    },
+    gameContent: {
+      type: 'matching',
+      items: [
+        { term: 'k', def: 'Қатаңдық коэффиценті' },
+        { term: 'x', def: 'Дененің ұзаруы' },
+        { term: 'F_серп', def: 'Серпімділік күші' },
+        { term: 'Н/м', def: 'Қатаңдық бірлігі' },
+        { term: 'Гук', def: 'Заң авторы' }
+      ]
     }
   },
   {
@@ -154,7 +232,7 @@ const allLessonsData = [
         <li>Шайбаның мұз үстінде ұзақ уақыт бойы баяуламастан сырғанауы (үйкеліс аз болса).</li>
       </ul>
     `,
-    videoId: "T8YyR69q8-E",
+    videoId: "o33xGDixJjw",
     quiz: [
       { q: "Дененің өз қозғалысын сақтау қасиеті қалай аталады?", a: ["Күш", "Үдеу", "Инерция", "Масса"], c: 2 },
       { q: "Автомобиль кенет оңға бұрылса, жолаушылар қайда қарай қисаяды?", a: ["Алға", "Оңға", "Солға", "Артқа"], c: 2 },
@@ -165,6 +243,10 @@ const allLessonsData = [
     labVerification: {
       instruction: "Инерцияны бақылаңыз. Егер үйкеліс мүлдем жоқ болса, 5 м/с жылдамдықпен сырғанаған дене 10 секундтан кейін қандай жылдамдықпен қозғалады?",
       correctAnswer: "5"
+    },
+    gameContent: {
+      type: 'scramble',
+      words: ["ИНЕРЦИЯ", "ТЫНЫШТЫҚ", "ГАЛИЛЕЙ", "САНАҚ"]
     }
   },
   {
@@ -191,7 +273,7 @@ const allLessonsData = [
 
       <p><b>Күш бірлігі:</b> 1 Ньютон (Н) – массасы 1 кг денеге 1 м/с² үдеу беретін күш. [1 Н = 1 кг·м/с²].</p>
     `,
-    videoId: "vX9P_4PjVfA",
+    videoId: "zhQHPqN0ADY",
     quiz: [
       { q: "Массасы 2 кг денеге 10 Н күш әсер етсе, оның үдеуі қандай болады?", a: ["5 м/с²", "20 м/с²", "12 м/с²", "0.2 м/с²"], c: 0 },
       { q: "Күш тұрақты болса, масса 3 есе артса үдеу қалай өзгереді?", a: ["3 есе артады", "3 есе кемейді", "9 есе кемейді", "Өзгермейді"], c: 1 },
@@ -202,6 +284,16 @@ const allLessonsData = [
     labVerification: {
       instruction: "0.5 кг денеге 4 Н күш әсер еткендегі үдеуді (a = F/m) есептеңіз.",
       correctAnswer: "8"
+    },
+    gameContent: {
+      type: 'matching',
+      items: [
+        { term: 'F = m · a', def: 'Ньютонның 2-заңы' },
+        { term: 'a = F / m', def: 'Үдеу формуласы' },
+        { term: 'F', def: 'Ньютон (Н)' },
+        { term: 'm', def: 'Килограмм (кг)' },
+        { term: 'a', def: 'м/с²' }
+      ]
     }
   },
   {
@@ -227,7 +319,7 @@ const allLessonsData = [
         <li>Қайықтан алға секіргенде, қайықтың артқа жылжуы – осы заңның айқын көрінісі.</li>
       </ul>
     `,
-    videoId: "Y7S1D9A7m_g",
+    videoId: "ah_By6VXR60",
     quiz: [
       { q: "Ньютонның 3-заңындағы күштер қалай бағытталған?", a: ["Бір жаққа", "Өзара перпендикуляр", "Қарама-қарсы", "Мүлдем бағыты жоқ"], c: 2 },
       { q: "Егер сен қабырғаны 50 Н күшпен итерсең, қабырға сені қандай күшпен итереді?", a: ["0 Н", "25 Н", "50 Н", "100 Н"], c: 2 },
@@ -238,6 +330,10 @@ const allLessonsData = [
     labVerification: {
       instruction: "Динамометрлермен тәжірибе: Бірінші динамометрді 15 Н күшпен тартсаңыз, екіншісі неше Н көрсетеді?",
       correctAnswer: "15"
+    },
+    gameContent: {
+      type: 'scramble',
+      words: ["ӘРЕКЕТ", "ҚАРСЫ", "БАҒЫТ", "ТЕПЕ-ТЕҢ"]
     }
   },
   {
@@ -262,7 +358,7 @@ const allLessonsData = [
 
       <p><b>Маңызды факт:</b> Егер арақашықтық 2 есе артса, тартылыс күші 4 есе (2²) кемиді.</p>
     `,
-    videoId: "iyS7A3x8uLg",
+    videoId: "PysU-ONz76A",
     quiz: [
       { q: "Тартылыс күші арақашықтыққа қалай тәуелді?", a: ["Тура пропорционал", "Квадратына кері пропорционал", "Тәуелді емес", "Тура квадратына пропорционал"], c: 1 },
       { q: "Бүкіләлемдік тартылыс заңын кім ашты?", a: ["Галилей", "Кеплер", "Ньютон", "Коперник"], c: 2 },
@@ -273,6 +369,16 @@ const allLessonsData = [
     labVerification: {
       instruction: "Есептеңіз: Егер денелер арасындағы қашықтық 3 есе артса, олардың тартылыс күші неше есе кемиді?",
       correctAnswer: "9"
+    },
+    gameContent: {
+      type: 'matching',
+      items: [
+        { term: 'G', def: 'Гравитациялық тұрақты' },
+        { term: 'r', def: 'Арақашықтық' },
+        { term: 'm1 · m2', def: 'Массалар көбейтіндісі' },
+        { term: '1/r²', def: 'Кері квадраттық заң' },
+        { term: 'Ньютон', def: 'Тартылыс заңының авторы' }
+      ]
     }
   },
   {
@@ -300,7 +406,7 @@ const allLessonsData = [
         <li><b>Сұйықтық тығыздығын</b> тікелей <i>ареометрмен</i> өлшеуге болады.</li>
       </ul>
     `,
-    videoId: "XpS5Y0XnB7Y",
+    videoId: "vHJOtkIjjoE",
     quiz: [
       { q: "Тығыздықтың формуласы қандай?", a: ["p=mv", "ρ=m/V", "F=ma", "ρ=V/m"], c: 1 },
       { q: "Массасы 100 г, көлемі 50 см³ дененің тығыздығы қандай?", a: ["0.5 г/см³", "2 г/см³", "5000 г/см³", "150 г/см³"], c: 1 },
@@ -311,6 +417,10 @@ const allLessonsData = [
     labVerification: {
       instruction: "0.2 кг (200 г) металл кесектің көлемі 25 см³ болса, оның тығыздығын (г/см³) табыңыз.",
       correctAnswer: "8"
+    },
+    gameContent: {
+      type: 'scramble',
+      words: ["ТЫҒЫЗДЫҚ", "КӨЛЕМ", "МАССА", "АРЕОМЕТР"]
     }
   },
   {
@@ -336,7 +446,7 @@ const allLessonsData = [
 
       <p><b>Газдардағы қысым:</b> Газ молекулаларының ыдыс қабырғасына соқтығысуынан туындайды. Ол температураға және көлемге тәуелді.</p>
     `,
-    videoId: "MvL6l7h_70E",
+    videoId: "kIcmmWB6oV8",
     quiz: [
       { q: "Қысымның өлшем бірлігі қандай?", a: ["Ньютон", "Джоуль", "Паскаль", "Ватт"], c: 2 },
       { q: "Аудан 2 есе азайса, қысым қалай өзгереді?", a: ["2 есе азаяды", "2 есе артады", "4 есе артады", "Өзгермейді"], c: 1 },
@@ -347,6 +457,16 @@ const allLessonsData = [
     labVerification: {
       instruction: "Пілдің бір аяғының ауданы 0.1 м², ал салмағы 40000 Н болса, оның 4 аяғымен жерге түсіретін қысымын (Па) табыңыз. (S_жалпы = 0.4)",
       correctAnswer: "100000"
+    },
+    gameContent: {
+      type: 'matching',
+      items: [
+        { term: 'p = F / S', def: 'Қысым формуласы' },
+        { term: 'Паскаль', def: 'Өлшем бірлігі' },
+        { term: 'S', def: 'Бет ауданы' },
+        { term: 'F', def: 'Түсетін күш' },
+        { term: 'Ине ұшы', def: 'Үлкен қысым' }
+      ]
     }
   },
   {
@@ -374,7 +494,7 @@ const allLessonsData = [
         <li><b>F_А < F_ауыр:</b> Дене батады.</li>
       </ol>
     `,
-    videoId: "0v86Yk14re8",
+    videoId: "zAdY_kZkfMg",
     quiz: [
       { q: "Архимед күші қай жаққа бағытталған?", a: ["Төмен", "Жоғары", "Оңға", "Бетке параллель"], c: 1 },
       { q: "Архимед күші дененің қандай қасиетіне тәуелді емес?", a: ["Сұйық тығыздығына", "Дене көлеміне", "Дене массасына (материалына)", "Батқан бөлігіне"], c: 2 },
@@ -385,6 +505,10 @@ const allLessonsData = [
     labVerification: {
       instruction: "Суда (1000 кг/м³) көлемі 0.005 м³ дене толық батып тұр. Оған әсер ететін Архимед күшін (Н) табыңыз. (g=10)",
       correctAnswer: "50"
+    },
+    gameContent: {
+      type: 'scramble',
+      words: ["АРХИМЕД", "СҰЙЫҚТЫҚ", "КЕРІ", "КӨЛЕМ"]
     }
   }
 ];

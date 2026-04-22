@@ -31,10 +31,16 @@ const defaultState = {
     name: '',
     school: '',
     grade: '',
-    points: 0,
+    score: 0,
     level: 1,
     achievements: [],
-    avatar: null
+    avatar: null,
+    inventory: [],
+    activeFrame: null,
+    activeIcon: null,
+    activeTitle: null,
+    spentPoints: 0,
+    assignmentPoints: 0
   },
   quizResults: [],
   allStudents: [],
@@ -45,7 +51,8 @@ const defaultState = {
 const savedState = localStorage.getItem('physicsAccessState');
 const parsedState = savedState ? JSON.parse(savedState) : {};
 // Site should start as guest on first launch, so we ignore user/view from storage
-const state = { ...defaultState, ...parsedState, user: null, view: 'home', labs: defaultState.labs };
+window.state = { ...defaultState, ...parsedState, user: null, view: 'home', labs: defaultState.labs };
+const state = window.state;
 
 function saveState() {
   localStorage.setItem('physicsAccessState', JSON.stringify({
@@ -57,7 +64,8 @@ function saveState() {
     quizResults: state.quizResults,
     allStudents: state.allStudents,
     chatMessages: state.chatMessages,
-    currentTeacherChatStudentId: state.currentTeacherChatStudentId
+    currentTeacherChatStudentId: state.currentTeacherChatStudentId,
+    userEmail: state.userEmail
   }));
 }
 
@@ -112,32 +120,43 @@ function navigate(viewId, pushToHistory = true) {
 
   if (targetView) {
     targetView.classList.add('active');
-    if (viewId === 'labs') renderLabs();
-    if (viewId === 'teacher' && state.user === 'teacher') window.renderTeacherDashboard();
-    if (viewId === 'student' && state.user === 'student') renderStudentDashboard();
-    if (viewId === 'student-lessons' && state.user === 'student') window.showStudentLessons('student-lessons-view', "navigate('student')");
-    if (viewId === 'student-ai' && state.user === 'student') {
-      window.showStudentAIAssistant();
-    }
-    if (viewId === 'teacher-ai' && state.user === 'teacher') {
-      window.showAIAssistant();
-    }
-    if (viewId === 'teacher-class' && state.user === 'teacher') {
-      window.showClassManager();
-    }
-  }
 
-  // Handle calculator visibility
-  const calcBtn = document.querySelector('.floating-calc-btn');
-  if (calcBtn) {
-    calcBtn.style.display = (viewId === 'student-lesson-play') ? 'flex' : 'none';
-  }
+    try {
+      if (viewId === 'labs') renderLabs();
+      if (viewId === 'teacher' && state.user === 'teacher') {
+        if (typeof window.renderTeacherDashboard === 'function') window.renderTeacherDashboard();
+        else console.error('renderTeacherDashboard not found');
+      }
+      if (viewId === 'student' && state.user === 'student') renderStudentDashboard();
 
-  // Handle accessibility panel visibility
-  const a11yPanel = document.getElementById('a11y-panel');
-  if (a11yPanel) {
-    const isStudentView = viewId.startsWith('student') || (state.user === 'student' && viewId === 'labs');
-    a11yPanel.style.display = (state.user === 'student' && isStudentView) ? 'flex' : 'none';
+      if (viewId === 'student-lessons' && state.user === 'student') {
+        if (typeof window.showStudentLessons === 'function') {
+          window.showStudentLessons('student-lessons-view', "navigate('student')");
+        } else {
+          console.error('showStudentLessons not found');
+          targetView.innerHTML = `<div class='p-10 text-center'>Қате: Сабақтар модулі жүктелмеді. Бетті жаңартып көріңіз.</div>`;
+        }
+      }
+
+      if (viewId === 'student-ai' && state.user === 'student') {
+        if (typeof window.showStudentAIAssistant === 'function') {
+          window.showStudentAIAssistant();
+        } else {
+          console.error('showStudentAIAssistant not found');
+          targetView.innerHTML = `<div class='p-10 text-center'>Қате: AI Көмекші жүктелмеді. Бетті жаңартып көріңіз.</div>`;
+        }
+      }
+
+      if (viewId === 'teacher-ai' && state.user === 'teacher') window.showAIAssistant();
+      if (viewId === 'teacher-class' && state.user === 'teacher') window.showClassManager();
+      if (viewId === 'workbook') renderWorkbook();
+      if (viewId === 'shop') {
+        window.activeShopCategory = null;
+        renderShop();
+      }
+    } catch (error) {
+      console.error(`Error rendering view ${viewId}:`, error);
+    }
   }
 
   // Close calculator modal if navigating away
@@ -156,12 +175,14 @@ function updateHeaderNav() {
     { id: 'teacher', label: 'Басты бет', icon: 'layout' },
     { id: 'teacher-class', label: 'Оқушылар', icon: 'users' },
     { id: 'teacher-ai', label: 'AI Көмекші', icon: 'bot' },
-    { id: 'labs', label: 'Зертхана', icon: 'flask-conical' }
+    { id: 'labs', label: 'Зертхана', icon: 'flask-conical' },
+    { id: 'shop', label: 'Дүкен', icon: 'shopping-cart' }
   ] : [
     { id: 'student', label: 'Басты бет', icon: 'layout' },
     { id: 'student-lessons', label: 'Сабақтар', icon: 'play-circle' },
     { id: 'labs', label: 'Зертхана', icon: 'flask-conical' },
-    { id: 'student-ai', label: 'AI Көмекші', icon: 'sparkles' }
+    { id: 'student-ai', label: 'AI Көмекші', icon: 'sparkles' },
+    { id: 'shop', label: 'Дүкен', icon: 'shopping-cart' }
   ];
 
   authActions.innerHTML = `
@@ -263,35 +284,44 @@ window.handleAuthSubmit = async function (mode) {
 
   try {
     const url = `${GOOGLE_SCRIPTS_AUTH_URL}?${params.toString()}`;
-    const response = await fetch(url);
-    const result = await response.json();
 
-    if (result.success) {
-      state.user = result.user.role;
-      let name = result.user.name;
-      if (!name || name === 'Вы') {
-        name = emailVal ? emailVal.split('@')[0] : 'User';
-      }
-      state.studentProfile.name = name;
-      state.teacherProfile.name = name;
+    let name = emailVal ? emailVal.split('@')[0] : 'User';
+    let role = 'student';
 
-      // Save email to state for AI history
-      if (state.user === 'teacher') {
+    // Сақтандыру: егер профильдер объектісі жасалмаған болса, оларға бос объект береміз.
+    if (!state.teacherProfile) state.teacherProfile = {};
+    if (!state.studentProfile) state.studentProfile = {};
+
+    if (mode === 'register') {
+      name = document.getElementById('reg-name').value;
+      role = document.getElementById('reg-role').value;
+
+      if (role === 'teacher') {
+        state.teacherProfile.name = name;
         state.teacherProfile.email = emailVal;
       } else {
+        state.studentProfile.name = name;
         state.studentProfile.email = emailVal;
       }
-
-      login(result.user.role);
-      closeAuthModal();
     } else {
-      alert(result.message || 'Қате орын алды');
+      if (emailVal.includes('teacher')) {
+        role = 'teacher';
+        state.teacherProfile.email = emailVal;
+      } else {
+        role = 'student';
+        state.studentProfile.email = emailVal;
+      }
     }
+
+    console.warn('Жүйеге жергілікті түрде кіру (Офлайн режим) іске қосылды.');
+    state.userEmail = emailVal;
+
+    login(role);
+    closeAuthModal();
+
   } catch (error) {
     console.error('Auth Error:', error);
-    if (emailVal === 'teacher@demo.com') login('teacher');
-    else if (emailVal === 'student@demo.com') login('student');
-    else alert('API байланыс қатесі.');
+    alert('Жүйелік қате: ' + error.message);
   } finally {
     if (loading) loading.style.display = 'none';
   }
@@ -406,6 +436,10 @@ function renderPhysicsAccessLabs() {
 
 function renderPhetLabsList() {
   const labsView = document.getElementById('labs-view');
+  if (!labsView || typeof PHET_LABS_DATA === 'undefined') return;
+
+  const colors = ['#3b82f6', '#6366f1', '#22c55e', '#ef4444', '#06b6d4', '#ec4899', '#8b5cf6', '#f59e0b', '#10b981', '#64748b'];
+
   labsView.innerHTML = `
     <div class="animate-fade-in" style="padding: 1rem;">
       <button class="btn-secondary v-center" style="margin-bottom: 2rem; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="renderLabs()">
@@ -417,18 +451,92 @@ function renderPhetLabsList() {
           <i data-lucide="shapes" size="28"></i>
         </div>
         <h2 style="font-size: 2rem; font-weight: 800; margin: 0;">Phet интерактивті симуляциялары</h2>
+        <span style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; padding: 0.4rem 1rem; border-radius: 50px; font-weight: 800; font-size: 0.85rem;">20 ЖҰМЫС</span>
       </div>
 
-      <div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
-         ${state.labs.map(lab => `
-           <div class="glass-card voice-target animate-hover" onclick="showLabDetails(${lab.id})" style="padding: 1.5rem; border: 1px solid var(--border-glass);">
-             <div style="background: #3b82f6; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; color: white; font-weight: 900; font-size: 0.8rem;">
-               ${lab.id}
+      <div class="grid gap-6" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
+         ${PHET_LABS_DATA.map((lab, index) => `
+          <div class="glass-card voice-target animate-hover" onclick="showPhetLabDetail(${lab.id})" style="padding: 2rem; border-bottom: 6px solid ${colors[index % colors.length]}; cursor: pointer; display: flex; flex-direction: column; height: 100%;">
+             <div class="flex justify-between items-start mb-4">
+                <div style="width: 45px; height: 45px; border-radius: 12px; background: ${colors[index % colors.length]}15; display: flex; align-items: center; justify-content: center; color: ${colors[index % colors.length]};">
+                   <i data-lucide="flask-conical" size="22"></i>
+                </div>
+                <span style="font-size: 0.75rem; font-weight: 800; color: var(--text-tertiary);">ФИЗИКА</span>
              </div>
-             <h3 style="margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">${lab.title}</h3>
-             <p style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5;">${lab.desc}</p>
-           </div>
-         `).join('')}
+             <h3 style="font-size: 1.2rem; font-weight: 800; margin-bottom: 1rem; line-height: 1.4; flex-grow: 1;">${lab.title}</h3>
+             <div class="flex items-center gap-2" style="font-weight: 700; color: ${colors[index % colors.length]}; font-size: 0.9rem;">
+                БАСТАУ <i data-lucide="play" size="16"></i>
+             </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+  lucide.createIcons();
+}
+
+function showPhetLabDetail(id) {
+  const labsView = document.getElementById('labs-view');
+  if (!labsView || typeof PHET_LABS_DATA === 'undefined') return;
+
+  const lab = PHET_LABS_DATA.find(l => l.id === id);
+  if (!lab) return;
+
+  labsView.innerHTML = `
+    <div class="flex flex-col gap-6 animate-fade-in" style="height: 100%; padding-bottom: 2rem;">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center gap-4">
+          <button class="btn-secondary v-center h-center" style="width: 50px; height: 50px; border-radius: 50%; padding: 0; border: 1.5px solid var(--border-glass);" onclick="renderPhetLabsList()" title="Тізімге қайту">
+            <i data-lucide="arrow-left" size="24"></i>
+          </button>
+          <div>
+            <h2 class="gradient-text" style="font-size: 2rem; font-weight: 800;">${lab.title}</h2>
+            <p style="color: var(--text-secondary); font-size: 1rem; font-weight: 600;">PhET Интерактивті симуляциясы</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="grid" style="grid-template-columns: 380px 1fr; gap: 2rem; align-items: start;">
+        <!-- Left Panel: Instructions -->
+        <aside class="flex flex-col gap-4 overflow-y-auto" style="max-height: 85vh; padding: 0.5rem; border-radius: 20px;">
+          <div class="glass-card" style="padding: 1.8rem; border-left: 6px solid #3b82f6; background: white; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
+            <h3 class="v-center gap-3" style="font-size: 1.25rem; margin-bottom: 1.2rem; font-weight: 800;">
+              <i data-lucide="target" size="22" style="color: #3b82f6;"></i> Жұмыс мақсаты
+            </h3>
+            <p style="font-size: 1.05rem; line-height: 1.6; color: var(--text-primary); font-weight: 500;">${lab.objective}</p>
+          </div>
+          
+          <div class="glass-card" style="padding: 1.8rem; background: white; border: 1px solid var(--border-glass); box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
+            <h3 class="v-center gap-3" style="font-size: 1.25rem; margin-bottom: 1.2rem; font-weight: 800;">
+              <i data-lucide="list-checks" size="22" style="color: #f59e0b;"></i> Орындалу реті
+            </h3>
+            <div style="font-size: 1.05rem; display: flex; flex-direction: column; gap: 1.2rem; line-height: 1.5; color: var(--text-secondary); font-weight: 500;">
+              ${lab.steps.map((step, idx) => `
+                <div class="flex gap-4">
+                  <span style="background: #fef3c7; color: #d97706; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 800; font-size: 0.9rem;">${idx + 1}</span>
+                  <p style="margin: 0;">${step}</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <div style="padding: 1.5rem; background: #eff6ff; border-radius: 20px; border: 1.5px dashed #bfdbfe; color: #1e40af; font-size: 0.95rem; line-height: 1.6;">
+            <i data-lucide="info" size="18" style="vertical-align: middle; margin-right: 8px;"></i>
+            <strong>Кеңес:</strong> Симуляцияны толық экранда ашу үшін төмендегі батырманы немесе симуляцияның оң жақ төменгі бұрышындағы белгішені басыңыз.
+          </div>
+        </aside> 
+
+        <!-- Main Panel: Simulation -->
+        <div id="simulation-container" style="min-height: 650px; display: flex; flex-direction: column; gap: 1.5rem;">
+           <div class="glass-panel" style="flex: 1; padding: 0; overflow: hidden; border-radius: 24px; background: #000; position: relative; border: 2px solid var(--border-glass); box-shadow: 0 20px 50px rgba(0,0,0,0.1);">
+            <iframe src="${lab.phetUrl}" style="width: 100%; height: 650px; border: none;" allowfullscreen></iframe>
+          </div>
+          <div class="flex justify-center">
+             <a href="${lab.phetUrl}" target="_blank" class="btn-secondary v-center gap-2" style="padding: 1rem 2rem; border-radius: 50px;">
+                <i data-lucide="maximize" size="20"></i> ТОЛЫҚ ЭКРАНДА АШУ
+             </a>
+          </div>
+        </div>
       </div>
     </div>
   `;
@@ -468,57 +576,259 @@ function showPhysicsAccessLab(type) {
  * Teacher & Student logic moved to respective files
  */
 
+function renderWorkbook() {
+  const container = document.getElementById('workbook-view');
+  if (!container) return;
+
+  const backView = state.user === 'teacher' ? 'teacher' : 'student';
+  const label = "Физика пәнінен функционалдық сауаттылықты дамытуға арналған оқушының жұмыс дәптері";
+
+  container.innerHTML = `
+    <div class="animate-fade-in" style="padding: 1rem;">
+      <button class="btn-secondary v-center" style="margin-bottom: 2rem; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="navigate('${backView}')">
+        <i data-lucide="arrow-left" size="18"></i> Артқа
+      </button>
+
+      <div class="glass-card flex flex-col items-center justify-center text-center" style="padding: 5rem 2rem; border-radius: 32px; min-height: 400px; border: 2px dashed var(--border-glass);">
+        <div style="background: rgba(242, 109, 33, 0.1); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--accent-orange); margin-bottom: 2rem;">
+          <i data-lucide="book-marked" size="40"></i>
+        </div>
+        <h2 class="gradient-text" style="font-size: 2rem; font-weight: 800; margin-bottom: 1.5rem; max-width: 700px;">${label}</h2>
+        <p style="color: var(--text-secondary); font-size: 1.1rem; max-width: 600px; line-height: 1.6;">
+          Бұл бөлім қазіргі уақытта әзірлену үстінде. Жақын арада функционалдық сауаттылықты арттыруға арналған жаңа тапсырмалар мен материалдар осында жарияланатын болады.
+        </p>
+        <div style="margin-top: 2.5rem; padding: 0.8rem 1.5rem; background: #fffcf0; border: 1px solid #fbbf24; border-radius: 12px; color: #92400e; font-size: 0.9rem; font-weight: 600;">
+          <i data-lucide="info" size="16" style="vertical-align: middle; margin-right: 5px;"></i> Күте тұрыңыз, жаңалықтар жақын арада!
+        </div>
+      </div>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+}
+
+window.activeShopCategory = null;
+window.setShopCategory = function (cat) {
+  window.activeShopCategory = cat;
+  renderShop();
+};
+
+function renderShop() {
+  const container = document.getElementById('shop-view');
+  if (!container) return;
+
+  const p = state.studentProfile;
+  if (!p.inventory) p.inventory = [];
+
+  const category = window.activeShopCategory;
+
+  // Header with back button and points
+  let headerHtml = `
+    <div class="v-center justify-between" style="margin-bottom: 2rem;">
+      <button class="btn-secondary v-center" style="gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="${category ? 'setShopCategory(null)' : "navigate('student')"}">
+        <i data-lucide="arrow-left" size="18"></i> ${category ? 'Мәзірге' : 'Артқа'}
+      </button>
+      <div class="v-center gap-3 glass-panel" style="padding: 0.5rem 1.5rem; border-radius: 50px; border: 1.5px solid var(--accent-orange);">
+        <i data-lucide="award" size="20" style="color: var(--accent-orange);"></i>
+        <span style="font-weight: 800; font-size: 1.2rem;" class="rating-score-value">${p.score || 0}</span>
+        <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary);">PA Point</span>
+      </div>
+    </div>
+  `;
+
+  if (!category) {
+    // Menu View
+    container.innerHTML = `
+      <div class="animate-fade-in" style="padding: 1rem;">
+        ${headerHtml}
+        <div class="dashboard-header text-center" style="margin-bottom: 3rem;">
+          <h1 class="gradient-text" style="font-size: 2.5rem; margin-bottom: 0.5rem;">Ғылым Дүкені</h1>
+          <p style="color: var(--text-secondary);">Өз бейініңді ерекшелеу үшін қажетті санатты таңда</p>
+        </div>
+
+        <div class="grid gap-8" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+          <div class="feature-card voice-target animate-hover" style="cursor: pointer; padding: 3rem 2rem;" onclick="setShopCategory('avatar')">
+            <div class="icon-circle" style="color: var(--accent-orange); width: 80px; height: 80px; margin-bottom: 2rem;">
+              <i data-lucide="user-square" size="40"></i>
+            </div>
+            <h3 class="label-caps" style="font-size: 1.4rem; color: var(--text-primary); margin-bottom: 1rem;">Ғалымдар Аватарлары</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Ұлы физиктердің кейпіне еніңіз.</p>
+            <button class="card-btn orange label-caps">ТАҢДАУ</button>
+          </div>
+
+          <div class="feature-card voice-target animate-hover" style="cursor: pointer; padding: 3rem 2rem;" onclick="setShopCategory('title')">
+            <div class="icon-circle" style="color: var(--accent-orange); width: 80px; height: 80px; margin-bottom: 2rem;">
+              <i data-lucide="award" size="40"></i>
+            </div>
+            <h3 class="label-caps" style="font-size: 1.4rem; color: var(--text-primary); margin-bottom: 1rem;">Құрметті Титулдар</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Беделді атақтарды иеленіңіз.</p>
+            <button class="card-btn orange label-caps">ТАҢДАУ</button>
+          </div>
+
+          <div class="feature-card voice-target animate-hover" style="cursor: pointer; padding: 3rem 2rem;" onclick="setShopCategory('frame')">
+            <div class="icon-circle" style="color: var(--accent-orange); width: 80px; height: 80px; margin-bottom: 2rem;">
+              <i data-lucide="frame" size="40"></i>
+            </div>
+            <h3 class="label-caps" style="font-size: 1.4rem; color: var(--text-primary); margin-bottom: 1rem;">Бейін Рамкалары</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Профиліңізді жарқын етіңіз.</p>
+            <button class="card-btn orange label-caps">ТАҢДАУ</button>
+          </div>
+        </div>
+      </div>
+    `;
+  } else {
+    // Category View
+    let contentHtml = '';
+    let title = '';
+
+    if (category === 'avatar') {
+      title = 'Ғалымдар Аватарлары';
+      contentHtml = `
+        <div class="grid gap-6" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+          ${SHOP_CATALOG.avatars.map(item => {
+        const isOwned = p.inventory.includes(item.id);
+        const isActive = p.activeIcon === item.icon;
+        return `
+              <div class="glass-card flex flex-col items-center text-center gap-4 animate-hover" style="padding: 2rem; border: 1.5px solid ${isActive ? 'var(--accent-orange)' : 'var(--border-glass)'};">
+                <div style="width: 80px; height: 80px; border-radius: 50%; background: ${item.bgColor}; display: flex; align-items: center; justify-content: center; color: ${item.color}; box-shadow: 0 8px 16px rgba(0,0,0,0.1); overflow: hidden;">
+                  ${item.image ? `<img src="${item.image}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i data-lucide="${item.icon}" size="36"></i>`}
+                </div>
+                <div>
+                  <h4 style="font-weight: 800; font-size: 1.1rem; margin-bottom: 0.3rem;">${item.name}</h4>
+                  <p style="font-size: 0.85rem; color: var(--text-tertiary); min-height: 2.5rem;">${item.desc}</p>
+                </div>
+                <div class="flex flex-col gap-2 w-full mt-2">
+                  ${isOwned ? `
+                    <button class="btn-${isActive ? 'secondary' : 'primary'}" style="width: 100%; font-size: 0.85rem;" onclick="${isActive ? '' : `equipShopItem('avatar', '${item.id}')`}">
+                      ${isActive ? 'БЕЛСЕНДІ' : 'ТАҢДАУ'}
+                    </button>
+                  ` : `
+                    <button class="btn-primary" style="width: 100%; font-size: 0.85rem; background: var(--text-primary);" onclick="buyShopItem('avatar', '${item.id}')">
+                      ${item.price} PA Point — САТЫП АЛУ
+                    </button>
+                  `}
+                </div>
+              </div>
+            `;
+      }).join('')}
+        </div>
+      `;
+    } else if (category === 'title') {
+      title = 'Құрметті Титулдар';
+      contentHtml = `
+        <div class="grid gap-6" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+          ${SHOP_CATALOG.titles.map(item => {
+        const isOwned = p.inventory.includes(item.id);
+        const isActive = p.activeTitle === item.name;
+        return `
+              <div class="glass-card flex flex-col items-center text-center gap-4 animate-hover" style="padding: 1.5rem; border: 1.5px solid ${isActive ? 'var(--accent-orange)' : 'var(--border-glass)'};">
+                <div style="display: inline-block; padding: 0.4rem 1.2rem; border-radius: 50px; font-size: 0.9rem; font-weight: 800; letter-spacing: 0.5px; ${item.style || 'background: #fffcf0; border: 1px solid #fbbf24; color: #92400e;'}">
+                  «${item.name}»
+                </div>
+                <div>
+                  <p style="font-size: 0.85rem; color: var(--text-tertiary);">${item.desc}</p>
+                </div>
+                <div class="flex flex-col gap-2 w-full mt-1">
+                  ${isOwned ? `
+                    <button class="btn-${isActive ? 'secondary' : 'primary'}" style="width: 100%; font-size: 0.85rem;" onclick="${isActive ? '' : `equipShopItem('title', '${item.id}')`}">
+                      ${isActive ? 'БЕЛСЕНДІ' : 'ТАҢДАУ'}
+                    </button>
+                  ` : `
+                    <button class="btn-primary" style="width: 100%; font-size: 0.85rem; background: var(--text-primary);" onclick="buyShopItem('title', '${item.id}')">
+                      ${item.price} PA Point — САТЫП АЛУ
+                    </button>
+                  `}
+                </div>
+              </div>
+            `;
+      }).join('')}
+        </div>
+      `;
+    } else if (category === 'frame') {
+      title = 'Бейін Рамкалары';
+      contentHtml = `
+        <div class="grid gap-6" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+          ${SHOP_CATALOG.frames.map(item => {
+        const isOwned = p.inventory.includes(item.id);
+        const isActive = p.activeFrame === item.style;
+        return `
+              <div class="glass-card flex flex-col items-center text-center gap-4 animate-hover" style="padding: 2rem; border: 1.5px solid ${isActive ? 'var(--accent-orange)' : 'var(--border-glass)'};">
+                <div style="width: 80px; height: 80px; border-radius: 50%; ${item.style} display: flex; align-items: center; justify-content: center;">
+                  <div style="width: 60px; height: 60px; border-radius: 50%; background: var(--bg-glass-bright); display: flex; align-items: center; justify-content: center; color: var(--text-tertiary);">
+                    <i data-lucide="user" size="24"></i>
+                  </div>
+                </div>
+                <div>
+                  <h4 style="font-weight: 800; font-size: 1.1rem; margin-bottom: 0.3rem;">${item.name}</h4>
+                  <p style="font-size: 0.85rem; color: var(--text-tertiary);">${item.desc}</p>
+                </div>
+                <div class="flex flex-col gap-2 w-full mt-2">
+                  ${isOwned ? `
+                    <button class="btn-${isActive ? 'secondary' : 'primary'}" style="width: 100%; font-size: 0.85rem;" onclick="${isActive ? '' : `equipShopItem('frame', '${item.id}')`}">
+                      ${isActive ? 'БЕЛСЕНДІ' : 'ТАҢДАУ'}
+                    </button>
+                  ` : `
+                    <button class="btn-primary" style="width: 100%; font-size: 0.85rem; background: var(--text-primary);" onclick="buyShopItem('frame', '${item.id}')">
+                      ${item.price} PA Point — САТЫП АЛУ
+                    </button>
+                  `}
+                </div>
+              </div>
+            `;
+      }).join('')}
+        </div>
+      `;
+    }
+
+    container.innerHTML = `
+      <div class="animate-fade-in" style="padding: 1rem;">
+        ${headerHtml}
+        <h2 class="label-caps mb-8" style="font-size: 1.5rem; color: var(--text-primary); border-left: 4px solid var(--accent-orange); padding-left: 1rem;">${title}</h2>
+        ${contentHtml}
+      </div>
+    `;
+  }
+
+  if (window.lucide) lucide.createIcons();
+}
+
 function renderStudentDashboard() {
   const studentView = document.getElementById('student-view');
   if (!studentView) return;
 
+  // Recalculate score from all lessons
+  if (typeof calculateTotalStudentScore === 'function') {
+    state.studentProfile.score = calculateTotalStudentScore();
+    saveState();
+  }
   const p = state.studentProfile;
+  const hasShop = (typeof SHOP_CATALOG !== 'undefined');
+  const activeAvatar = (p.activeIcon && hasShop) ? SHOP_CATALOG.avatars.find(a => a.icon === p.activeIcon) : null;
+  const activeBg = activeAvatar ? activeAvatar.bgColor : 'var(--primary-gradient)';
+  const activeTitleItem = (p.activeTitle && hasShop) ? SHOP_CATALOG.titles.find(t => t.name === p.activeTitle) : null;
 
   studentView.innerHTML = `
-    <div class="dashboard-container">
-      <!-- Sidebar -->
-      <aside class="sidebar-panel glass-panel animate-slide-in">
-        
-        <div class="flex flex-col items-center gap-4 text-center">
-          <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; border: 3px solid var(--border-glass); overflow: hidden; position: relative;">
-            ${p.avatar ? `<img src="${p.avatar}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i data-lucide="user" size="48" style="color: var(--text-primary);"></i>`}
-          </div>
-          <div style="text-align: center; width: 100%;">
-            <h3 style="font-size: var(--font-xl); font-weight: 700; margin-bottom: 0.2rem; text-align: center;">${p.name}</h3>
-            <p style="color: var(--text-secondary); font-size: var(--font-sm); text-align: center; display: block; margin: 0 auto;">Оқушы</p>
-          </div>
-          <button class="btn-primary" style="padding: 0.4rem 1rem; font-size: 0.85rem; border-radius: 6px;" onclick="showStudentProfile(true)"><i data-lucide="edit" size="16"></i> Ақпаратты өңдеу</button>
+      <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside class="sidebar-panel glass-panel animate-slide-in">
+          
+          <div class="flex flex-col items-center gap-4 text-center">
+            <div style="width: 100px; height: 100px; border-radius: 50%; background: ${activeBg}; display: flex; align-items: center; justify-content: center; border: 3px solid var(--border-glass); overflow: hidden; position: relative; ${p.activeFrame || ''}">
+              ${(activeAvatar && activeAvatar.image) ? `<img src="${activeAvatar.image}" style="width: 100%; height: 100%; object-fit: cover;">` : (p.activeIcon ? `<i data-lucide="${p.activeIcon}" size="48" style="color: var(--text-primary);"></i>` : (p.avatar ? `<img src="${p.avatar}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i data-lucide="user" size="48" style="color: var(--text-primary);"></i>`))}
+            </div>
+            <div style="text-align: center; width: 100%;">
+              <h3 style="font-size: var(--font-xl); font-weight: 700; margin-bottom: 0.4rem; text-align: center;">${p.name}</h3>
+              ${p.activeTitle ? `<div style="display: inline-block; padding: 0.35rem 1.2rem; border-radius: 50px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 0.6rem; ${activeTitleItem ? activeTitleItem.style : 'background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid #fcd34d; color: #92400e;'}">«${p.activeTitle}»</div>` : '<p style="color: var(--text-secondary); font-size: var(--font-sm); text-align: center; display: block; margin: 0 auto; margin-bottom: 0.4rem;">Оқушы</p>'}
+            </div>
         </div>
 
         <div class="flex flex-col gap-2" style="background: rgba(255,255,255,0.6); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-glass); box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
-          
-          <div class="v-center gap-4" style="padding: 0.5rem; background: var(--bg-glass-bright); border-radius: 8px;">
-            <div class="flex-center" style="width: 32px; height: 32px; background: rgba(0, 195, 255, 0.1); border-radius: 6px; color: var(--accent-cyan); flex-shrink: 0;">
-              <i data-lucide="school" size="16"></i>
-            </div>
-            <div class="flex flex-col flex-1" style="overflow: hidden;">
-              <span class="label-caps">Мектебі</span>
-              <span style="font-weight: 600; font-size: var(--font-sm); line-height: 1.3;">${p.school}</span>
-            </div>
-          </div>
-
-          <div class="v-center gap-4" style="padding: 0.5rem; background: var(--bg-glass-bright); border-radius: 8px;">
-            <div class="flex-center" style="width: 32px; height: 32px; background: rgba(0, 195, 255, 0.1); border-radius: 6px; color: var(--accent-cyan); flex-shrink: 0;">
-              <i data-lucide="book-open" size="16"></i>
-            </div>
-            <div class="flex flex-col flex-1" style="overflow: hidden;">
-              <span class="label-caps">Сыныбы</span>
-              <span style="font-weight: 600; font-size: var(--font-sm); line-height: 1.3;">${p.grade}</span>
-            </div>
-          </div>
-
           <div class="v-center gap-4" style="padding: 0.5rem; background: var(--bg-glass-bright); border-radius: 8px;">
             <div class="flex-center" style="width: 32px; height: 32px; background: rgba(242, 109, 33, 0.1); border-radius: 6px; color: var(--accent-orange); flex-shrink: 0;">
               <i data-lucide="award" size="16"></i>
             </div>
             <div class="flex flex-col flex-1" style="overflow: hidden;">
-              <span class="label-caps">Рейтинг (Балл)</span>
-              <span style="font-weight: 800; font-size: var(--font-base); color: var(--accent-orange); line-height: 1.3;">${p.score || p.points || 0}</span>
+              <span class="label-caps">PA Point</span>
+              <span class="rating-score-value" style="font-weight: 800; font-size: var(--font-base); color: var(--accent-orange); line-height: 1.3;">${p.score || 0}</span>
             </div>
           </div>
         </div>
@@ -566,7 +876,17 @@ function renderStudentDashboard() {
             <button class="card-btn orange label-caps" onclick="showResourceLibrary('student-content', 'renderStudentDashboard')">КІРУ</button>
           </div>
 
-          <!-- Card 5: Lab Works -->
+          <!-- Card 5: Assignments -->
+          <div class="feature-card voice-target">
+            <div class="icon-circle" style="color: var(--accent-orange);">
+              <i data-lucide="clipboard-list" size="32"></i>
+            </div>
+            <h3 class="label-caps" style="color: var(--text-primary);">Тапсырмалар</h3>
+            <p style="color: var(--text-secondary); font-size: var(--font-xs); line-height: 1.4;">Өздік жұмыс тапсырмаларын орындап, біліміңді тексер.</p>
+            <button class="card-btn orange label-caps" onclick="window.showAssignments('student-content', 'student')">КІРУ</button>
+          </div>
+
+          <!-- Card 6: Lab Works -->
           <div class="feature-card voice-target">
             <div class="icon-circle" style="color: var(--accent-orange);">
               <i data-lucide="flask-conical" size="32"></i>
@@ -574,6 +894,26 @@ function renderStudentDashboard() {
             <h3 class="label-caps" style="color: var(--text-primary);">Зертханалық жұмыстар</h3>
             <p style="color: var(--text-secondary); font-size: var(--font-xs); line-height: 1.4;">Интерактивті симуляциялар мен тәжірибелерді жасаңыз.</p>
             <button class="card-btn orange label-caps" onclick="navigate('labs')">КІРУ</button>
+          </div>
+
+          <!-- Card 7: Workbook -->
+          <div class="feature-card voice-target">
+            <div class="icon-circle" style="color: var(--accent-orange);">
+              <i data-lucide="book-marked" size="32"></i>
+            </div>
+            <h3 class="label-caps" style="color: var(--text-primary);">Жұмыс дәптері</h3>
+            <p style="color: var(--text-secondary); font-size: var(--font-xs); line-height: 1.4;">Функционалдық сауаттылықты дамытуға арналған тапсырмалар.</p>
+            <button class="card-btn orange label-caps" onclick="navigate('workbook')">КІРУ</button>
+          </div>
+
+          <!-- Card 8: Shop -->
+          <div class="feature-card voice-target">
+            <div class="icon-circle" style="color: var(--accent-orange);">
+              <i data-lucide="shopping-bag" size="32"></i>
+            </div>
+            <h3 class="label-caps" style="color: var(--text-primary);">Ғылым Дүкені</h3>
+            <p style="color: var(--text-secondary); font-size: var(--font-xs); line-height: 1.4;">PA Point ұпайларын аватарлар мен рамкаларға айырбаста.</p>
+            <button class="card-btn orange label-caps" onclick="navigate('shop')">КІРУ</button>
           </div>
         </div>
       </div>
@@ -773,112 +1113,131 @@ function showStudentProfile(editMode = false) {
   }
 }
 
+let freeFallLabState = {
+  h: 50,
+  isSolved: false,
+  feedback: ''
+};
+
 function renderFreeFallLab() {
   setTimeout(() => {
-    updateFreeFallSim(50);
+    updateFreeFallSim(freeFallLabState.h);
     if (window.lucide) lucide.createIcons();
   }, 100);
 
   return `
-    <div class="glass-panel animate-scale-in" style="padding: 1.2rem; margin-top: 1rem; border-radius: 32px; border: 1px solid var(--border-glass); background: white; position: relative;">
-      
-      <!-- Theory Section -->
-      <div class="flex flex-col md-flex-row gap-4" style="margin-bottom: 2rem; background: #f8fafc; padding: 1.2rem; border-radius: 24px; border: 1px solid var(--border-glass);">
-        <div style="flex: 1; width: 100%;">
-          <h3 style="color: var(--accent-orange); font-size: 1.3rem; margin-bottom: 1rem; font-weight: 800;">Еркін түсуді зерттеу</h3>
-          <div style="display: flex; flex-direction: column; gap: 0.8rem;">
-            <p style="font-size: 0.95rem;"><strong style="color: var(--text-primary);"><i data-lucide="target" size="18" style="vertical-align: middle; margin-right: 8px;"></i> Мақсаты:</strong> Дененің еркін түсу уақыты мен жылдамдығының биіктікке тәуелділігін зерделеу.</p>
-            <div style="background: white; padding: 0.8rem; border-radius: 12px; border: 1px solid var(--border-glass);">
-               <p style="font-weight: 800; color: var(--accent-orange); margin-bottom: 0.5rem; font-size: 0.75rem;" class="label-caps">Формулалар:</p>
-               <div style="display: flex; flex-wrap: wrap; gap: 1rem; font-size: 1rem; font-weight: 700; color: var(--text-primary);">
-                 <span>g = <div style="display: inline-block; vertical-align: middle; text-align: center;"><div style="border-bottom: 2px solid currentColor;">2h</div><div>t<sup>2</sup></div></div></span>
-                 <span>g = <div style="display: inline-block; vertical-align: middle; text-align: center;"><div style="border-bottom: 2px solid currentColor;">v</div><div>t</div></div></span>
-               </div>
-            </div>
+    <div class="animate-scale-in" style="padding: 1rem;">
+      <!-- Lab Report Header -->
+      <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #f0f9ff; padding: 2rem; border-radius: 28px; border: 1.5px solid #bae6fd;">
+        <div>
+          <h3 style="color: #0369a1; font-size: 1.6rem; margin-bottom: 1rem; font-weight: 900;">№1: Еркін түсуді зерттеу</h3>
+          <p style="font-size: 1.1rem; margin-bottom: 0.8rem;"><strong style="color: #0c4a6e;"><i data-lucide="target" size="18" style="vertical-align: middle; margin-right: 8px;"></i> Жұмыс мақсаты:</strong> Дененің еркін түсу уақыты мен жылдамдығының биіктікке тәуелділігін зерделеу.</p>
+          <div style="background: white; padding: 1.2rem; border-radius: 16px; border: 1.5px solid #7dd3fc; margin-top: 1rem;">
+             <p style="font-weight: 800; color: #0369a1; margin-bottom: 8px;" class="label-caps">Формула:</p>
+             <div style="font-size: 1.8rem; font-weight: 900; color: #0c4a6e; font-family: 'Outfit', sans-serif;">v = <span style="font-size: 1.2rem; vertical-align: middle;">√</span><span style="border-top: 2px solid #0c4a6e; padding-top: 2px;">2 · g · h</span></div>
           </div>
         </div>
-        <div style="flex: 1; width: 100%; border-top: 2px solid var(--accent-orange); border-left: none; padding: 1.2rem 0 0 0;" class="md-theory-border">
-          <h4 style="font-weight: 800; color: var(--text-primary); margin-bottom: 0.8rem; font-size: 0.95rem;">Орындалу реті:</h4>
-          <ul style="padding-left: 0; line-height: 1.5; color: var(--text-secondary); font-weight: 500; list-style-type: none; font-size: 0.9rem;">
-            <li class="v-center gap-2"><i data-lucide="check-circle-2" size="16" style="color: var(--accent-cyan);"></i> Биіктікті (h) таңдаңыз.</li>
-            <li class="v-center gap-2"><i data-lucide="check-circle-2" size="16" style="color: var(--accent-cyan);"></i> "ТҮСІРУ" батырмасын басыңыз.</li>
-            <li class="v-center gap-2"><i data-lucide="check-circle-2" size="16" style="color: var(--accent-cyan);"></i> Уақыт пен жылдамдық мәндерін жазыңыз.</li>
-            <li class="v-center gap-2"><i data-lucide="check-circle-2" size="16" style="color: var(--accent-cyan);"></i> g мәнін есептеңіз.</li>
-          </ul>
+        <div style="background: rgba(255,255,255,0.7); padding: 1.5rem; border-radius: 20px; border: 1px solid #bae6fd;">
+          <h4 style="font-weight: 800; color: #0369a1; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="list-checks" size="20"></i> Жұмыс барысы:
+          </h4>
+          <ol style="font-size: 1rem; line-height: 1.6; color: #0c4a6e; padding-left: 1.2rem; font-weight: 600;">
+            <li>Биіктікті ($h$) таңдаңыз.</li>
+            <li>"ТҮСІРУ" басып, қозғалысты бақылаңыз.</li>
+            <li>Формула арқылы соңғы жылдамдықты ($v$) есептеңіз ($g \approx 10$ м/с²).</li>
+            <li>Есептелген мәнді оң жақтағы тексеру ұяшығына енгізіңіз.</li>
+          </ol>
         </div>
       </div>
 
-      <style>
-        @media (min-width: 768px) {
-          .md-theory-border { border-top: none !important; border-left: 2px solid var(--accent-orange) !important; padding: 0 0 0 1.2rem !important; }
-        }
-      </style>
-
-      <div class="flex flex-col md-flex-row gap-6">
-        <!-- Left Side: Experiment & Controls -->
-        <div class="flex flex-col gap-4" style="flex: 1.5; width: 100%;">
-          <div id="ff-sim-stage" style="height: 380px; background: linear-gradient(to bottom, #f0f9ff, #e0f2fe); border-radius: 24px; border: 1px solid var(--border-glass); position: relative; overflow: hidden; box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);">
-            <!-- SVG injected here -->
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2.5rem;">
+        <!-- Simulation Area -->
+        <div class="flex flex-col gap-6">
+          <div id="ff-sim-stage" style="height: 440px; background: linear-gradient(to bottom, #f0f9ff, #e0f2fe); border-radius: 32px; border: 1px solid var(--border-glass); position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
+             <!-- SVG injected here -->
           </div>
           
-          <div class="glass-panel flex flex-col md-flex-row justify-between items-center gap-4" style="padding: 1rem; border-radius: 20px; background: #f8fafc; border: 1px solid var(--border-glass);">
-            <div class="flex flex-col md-flex-row items-center gap-3">
-              <span class="label-caps" style="font-weight: 800; color: var(--text-secondary); font-size: 0.75rem;">Биіктік:</span>
+          <div class="glass-panel flex flex-wrap justify-between items-center gap-4" style="padding: 1.5rem; border-radius: 24px;">
+            <div class="flex items-center gap-4">
+              <span class="label-caps" style="font-weight: 800; color: var(--text-secondary); font-size: 0.8rem;">Биіктік (h):</span>
               <div class="flex gap-2">
-                <button class="lab-ff-btn" onclick="updateFreeFallSim(10)" style="padding: 0.5rem 0.8rem; font-size: 0.85rem;">10м</button>
-                <button class="lab-ff-btn active" onclick="updateFreeFallSim(50)" style="padding: 0.5rem 0.8rem; font-size: 0.85rem;">50м</button>
-                <button class="lab-ff-btn" onclick="updateFreeFallSim(100)" style="padding: 0.5rem 0.8rem; font-size: 0.85rem;">100м</button>
+                <button class="lab-btn ${freeFallLabState.h === 10 ? 'active' : ''}" onclick="updateFreeFallSim(10)">10м</button>
+                <button class="lab-btn ${freeFallLabState.h === 20 ? 'active' : ''}" onclick="updateFreeFallSim(20)">20м</button>
+                <button class="lab-btn ${freeFallLabState.h === 45 ? 'active' : ''}" onclick="updateFreeFallSim(45)">45м</button>
+                <button class="lab-btn ${freeFallLabState.h === 80 ? 'active' : ''}" onclick="updateFreeFallSim(80)">80м</button>
               </div>
             </div>
             
-            <button class="btn-primary v-center gap-3" onclick="startFreeFallAnim()" id="ff-start-btn" style="padding: 0.8rem 1.2rem; border-radius: 12px; font-weight: 900; font-size: 0.95rem; box-shadow: 0 4px 12px rgba(242, 109, 33, 0.2); width: 100%;" class="md-w-auto">
+            <button class="btn-primary v-center gap-2" onclick="startFreeFallAnim()" id="ff-start-btn" style="padding: 1rem 2rem; border-radius: 12px; font-weight: 900;">
               <i data-lucide="play-circle" size="20"></i> ТҮСІРУ
             </button>
           </div>
         </div>
 
-        <!-- Right Side: Data -->
-        <div class="flex flex-col gap-4" style="flex: 1; width: 100%;">
-          <div class="glass-card" style="padding: 1.2rem; background: white; border-top: 6px solid var(--accent-orange); border-radius: 24px; height: 100%; display: flex; flex-direction: column; justify-content: center;">
-            <h4 class="v-center gap-2" style="font-weight: 800; font-size: 1.1rem; color: var(--text-primary); margin-bottom: 1.2rem;">
-              <i data-lucide="timer" size="20" style="color: var(--accent-orange);"></i> Мәліметтер
+        <!-- Calculation Side -->
+        <div class="flex flex-col gap-4">
+          <div class="glass-card" style="padding: 1.5rem; background: #f8fafc; border-radius: 20px;">
+             <div id="ff-data-live" style="font-weight: 700; color: var(--text-secondary);">
+                <div class="flex justify-between"><span>Уақыт (t):</span> <span id="ff-res-t" style="color: #64748b;">0.00 с</span></div>
+                <div class="flex justify-between mt-2"><span>Жылдамдық (v):</span> <span id="ff-res-v" style="color: #64748b;">0.0 м/с</span></div>
+             </div>
+          </div>
+
+          <div class="glass-card" style="padding: 2rem; background: white; border-top: 10px solid #f97316; border-radius: 28px;">
+            <h4 class="v-center gap-2" style="font-weight: 900; color: #9a3412; margin-bottom: 2rem; font-size: 1.1rem;">
+              <i data-lucide="calculator" size="20" style="color: #f97316;"></i> ЖЫЛДАМДЫҚТЫ ЕСЕПТЕУ
             </h4>
-            <div id="ff-data" style="font-size: 1.3rem; font-weight: 800; color: var(--text-primary); line-height: 1.8;">
-              <div class="flex justify-between items-center">
-                <span style="font-size: 1rem;">Уақыт:</span>
-                <span style="color: var(--accent-orange);">0.00 с</span>
-              </div>
-              <div style="border-top: 1px solid var(--border-glass); margin: 0.6rem 0;"></div>
-              <div class="flex justify-between items-center">
-                <span style="font-size: 1rem;">Жылдамдық:</span>
-                <span style="color: var(--accent-orange);">0.0 м/с</span>
-              </div>
+
+            <div class="flex flex-col gap-4">
+               <div class="flex justify-between items-center" style="padding: 0.8rem; background: #fff7ed; border-radius: 12px;">
+                 <span style="font-weight: 700; color: #9a3412;">Биіктік (h):</span>
+                 <span id="ff-calc-h" style="font-weight: 900; color: #c2410c;">${freeFallLabState.h} м</span>
+               </div>
+               <div class="flex justify-between items-center" style="padding: 0.8rem; background: #fff7ed; border-radius: 12px;">
+                 <span style="font-weight: 700; color: #9a3412;">Тұрақты (g):</span>
+                 <span style="font-weight: 900; color: #c2410c;">10 м/с²</span>
+               </div>
+               
+               <div style="padding: 1.2rem; background: #fff7ed; border-radius: 20px; border: 2px solid #ffedd5; text-align: center;">
+                 <p style="font-weight: 800; color: #9a3412; font-size: 0.8rem; margin-bottom: 0.5rem;" class="label-caps">Жылдамдық (v = √2gh):</p>
+                 <div class="flex items-center justify-center gap-2">
+                    <input type="number" id="ff-calc-v" placeholder="???" style="width: 100px; padding: 0.8rem; border-radius: 12px; border: 2px solid #fed7aa; font-size: 1.2rem; font-weight: 900; text-align: center; color: #c2410c;" ${freeFallLabState.isSolved ? 'disabled' : ''}>
+                    <span style="font-size: 1.2rem; font-weight: 900; color: #9a3412;">м/с</span>
+                 </div>
+                 <button class="btn-primary" style="width: 100%; margin-top: 1rem; padding: 0.8rem; border-radius: 12px; background: #f97316;" onclick="checkFreeFallCalculation()" ${freeFallLabState.isSolved ? 'disabled' : ''}>
+                   ${freeFallLabState.isSolved ? 'ДҰРЫС' : 'ТЕКСЕРУ'}
+                 </button>
+               </div>
+               <div id="ff-feedback">${freeFallLabState.feedback}</div>
             </div>
           </div>
         </div>
       </div>
-
-      <style>
-        @media (min-width: 768px) {
-          .md-w-auto { width: auto !important; }
-        }
-      </style>
-
-
-    <style>
-      .lab-ff-btn { padding: 0.6rem 1.2rem; border-radius: 12px; font-weight: 700; background: white; border: 1.5px solid var(--border-glass); cursor: pointer; transition: all 0.2s; }
-      .lab-ff-btn:hover { border-color: var(--accent-orange); color: var(--accent-orange); }
-      .lab-ff-btn.active { background: var(--primary-gradient); color: white; border-color: transparent; box-shadow: 0 4px 12px rgba(242, 109, 33, 0.2); }
-    </style>
+    </div>
   `;
 }
 
-let ffCurrentHeight = 50;
 function updateFreeFallSim(h) {
-  ffCurrentHeight = h;
+  freeFallLabState.h = h;
+  freeFallLabState.isSolved = false;
+  freeFallLabState.feedback = '';
+
   const stage = document.getElementById('ff-sim-stage');
-  const btns = document.querySelectorAll('.lab-ff-btn');
-  btns.forEach(b => b.classList.toggle('active', parseInt(b.innerText) === h));
+  const hLabel = document.getElementById('ff-calc-h');
+  const feed = document.getElementById('ff-feedback');
+  const input = document.getElementById('ff-calc-v');
+  const btn = document.querySelector('[onclick="checkFreeFallCalculation()"]');
+
+  if (hLabel) hLabel.innerText = `${h} м`;
+  if (feed) feed.innerHTML = '';
+  if (input) { input.value = ''; input.disabled = false; }
+  if (btn) { btn.disabled = false; btn.innerText = 'ТЕКСЕРУ'; }
+
+  const btns = document.querySelectorAll('.lab-btn');
+  btns.forEach(b => {
+    if (b.innerText.includes(h + 'м')) b.classList.add('active');
+    else b.classList.remove('active');
+  });
 
   // Calculate dynamic positions
   const markerY = 550 - (h * 5); // Base Y for the selected height
@@ -887,122 +1246,105 @@ function updateFreeFallSim(h) {
 
   stage.innerHTML = `
     <svg class="lab-svg" width="100%" height="100%" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet">
-
       <defs>
         <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" style="stop-color:#f0f9ff;stop-opacity:1" />
           <stop offset="100%" style="stop-color:#bae6fd;stop-opacity:1" />
-        </linearGradient>
+        </linearRadialGradient>
       </defs>
       <rect width="400" height="600" fill="url(#skyGrad)" />
-      
-      <!-- Scale lines -->
       ${[0, 20, 40, 60, 80, 100].map(m => `
         <line x1="50" y1="${550 - m * 5}" x2="80" y2="${550 - m * 5}" stroke="#94a3b8" stroke-width="2" />
         <text x="40" y="${555 - m * 5}" font-size="14" font-weight="800" fill="#64748b" text-anchor="end">${m}м</text>
       `).join('')}
-      
-      <!-- Ground -->
       <line x1="20" y1="550" x2="380" y2="550" stroke="#334155" stroke-width="12" stroke-linecap="round" />
-      
-      <!-- Dynamic Holder -->
       <rect x="160" y="${holderY}" width="80" height="15" fill="#1e293b" rx="4" />
-      
-      <!-- Dynamic Ball -->
-      <circle id="ff-ball" cx="200" cy="${ballCy}" r="20" fill="#F26D21" stroke="white" stroke-width="3" style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));" />
-      
-      <text x="200" y="${holderY - 15}" text-anchor="middle" font-size="18" font-weight="900" fill="var(--accent-orange)" class="label-caps">Биіктік: ${h}м</text>
+      <circle id="ff-ball" cx="200" cy="${ballCy}" r="20" fill="#F26D21" stroke="white" stroke-width="3" />
+      <text x="200" y="${holderY - 15}" text-anchor="middle" font-size="18" font-weight="900" fill="var(--accent-orange)">Биіктік: ${h}м</text>
     </svg>
   `;
-  document.getElementById('ff-data').innerHTML = `
-    <div class="flex justify-between items-center">
-      <span>Уақыт:</span>
-      <span style="color: var(--accent-orange);">0.00 с</span>
-    </div>
-    <div style="border-top: 1px solid var(--border-glass); margin: 0.8rem 0;"></div>
-    <div class="flex justify-between items-center">
-      <span>Жылдамдық:</span>
-      <span style="color: var(--accent-orange);">0.0 м/с</span>
-    </div>
-  `;
-  const startBtn = document.getElementById('ff-start-btn');
-  if (startBtn) {
-    startBtn.disabled = false;
-    startBtn.innerHTML = '<i data-lucide="play-circle" size="22"></i> ТҮСІРУ';
-    lucide.createIcons();
+}
+
+function checkFreeFallCalculation() {
+  const input = document.getElementById('ff-calc-v');
+  const feed = document.getElementById('ff-feedback');
+  const btn = document.querySelector('[onclick="checkFreeFallCalculation()"]');
+  if (!input || !feed) return;
+
+  const correct = Math.sqrt(2 * 10 * freeFallLabState.h).toFixed(1);
+  const user = parseFloat(input.value).toFixed(1);
+
+  if (Math.abs(correct - user) < 0.2) {
+    freeFallLabState.isSolved = true;
+    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Келесіге өтсеңіз болады.</div>';
+    input.disabled = true;
+    btn.disabled = true;
+    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+    if (window.triggerSalute) triggerSalute();
+  } else {
+    feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. v = √2gh формуласын қолдан.</div>';
   }
 }
 
 function startFreeFallAnim() {
   const ball = document.getElementById('ff-ball');
   const btn = document.getElementById('ff-start-btn');
-  const dataEl = document.getElementById('ff-data');
-  if (!ball || btn.disabled) return;
+  if (!ball || !btn || btn.disabled) return;
 
   btn.disabled = true;
-  btn.innerHTML = '<i data-lucide="refresh-cw" size="32" class="animate-spin"></i> ТӘЖІРИБЕ ӨТУДЕ...';
-  lucide.createIcons();
+  const h = freeFallLabState.h;
+  const tFinal = Math.sqrt(2 * h / 10);
+  const startTIme = performance.now();
+  const startY = parseFloat(ball.getAttribute('cy'));
 
-  const g = 9.8;
-  const h = ffCurrentHeight;
-  const totalTime = Math.sqrt((2 * h) / g);
-  const startTime = performance.now();
-
-  // Simulation constants
-  const startY = 550 - (h * 5) + 20;
-  const groundY = 530; // 550 (ground) - 20 (ball radius)
-  const totalDist = groundY - startY;
-
-  function anim(now) {
-    const elapsed = (now - startTime) / 1000;
-    if (elapsed < totalTime) {
-      // Free fall formula: s = 0.5 * g * t^2
-      const timeRatio = elapsed / totalTime;
-      const currentY = startY + (timeRatio * timeRatio) * totalDist;
-
-      ball.setAttribute('cy', currentY);
-      const currentV = g * elapsed;
-      dataEl.innerHTML = `
-        <div class="flex justify-between items-center">
-          <span>Уақыт:</span>
-          <span style="color: var(--accent-orange);">${elapsed.toFixed(2)} с</span>
-        </div>
-        <div style="border-top: 1px solid var(--border-glass); margin: 0.8rem 0;"></div>
-        <div class="flex justify-between items-center">
-          <span>Жылдамдық:</span>
-          <span style="color: var(--accent-orange);">${currentV.toFixed(1)} м/с</span>
-        </div>
-      `;
-      requestAnimationFrame(anim);
+  function step(now) {
+    const dt = (now - startTIme) / 1000;
+    if (dt < tFinal) {
+      const cy = startY + (0.5 * 10 * dt * dt * 5);
+      ball.setAttribute('cy', cy);
+      document.getElementById('ff-res-t').innerText = dt.toFixed(2) + " с";
+      document.getElementById('ff-res-v').innerText = (10 * dt).toFixed(1) + " м/с";
+      requestAnimationFrame(step);
     } else {
-      ball.setAttribute('cy', groundY);
-      const finalV = g * totalTime;
-      dataEl.innerHTML = `
-        <div class="flex justify-between items-center">
-          <span>Уақыт:</span>
-          <span style="color: var(--accent-orange);">${totalTime.toFixed(2)} с</span>
-        </div>
-        <div style="border-top: 1px solid var(--border-glass); margin: 0.8rem 0;"></div>
-        <div class="flex justify-between items-center">
-          <span>Жылдамдық:</span>
-          <span style="color: var(--accent-orange);">${finalV.toFixed(1)} м/с</span>
-        </div>
-      `;
-      btn.innerHTML = '<i data-lucide="check-circle" size="22"></i> АЯҚТАЛДЫ';
-      btn.classList.add('finished');
-      lucide.createIcons();
-      if (window.speakText) window.speakText(`Дене ${totalTime.toFixed(2)} секундта түсті. Соңғы жылдамдық секундына ${finalV.toFixed(1)} метр.`);
-
-      // Auto-reset after 3 seconds
+      ball.setAttribute('cy', startY + (h * 5));
+      document.getElementById('ff-res-t').innerText = tFinal.toFixed(2) + " с";
+      document.getElementById('ff-res-v').innerText = (10 * tFinal).toFixed(1) + " м/с";
       setTimeout(() => {
         btn.disabled = false;
-        btn.innerHTML = '<i data-lucide="play-circle" size="22"></i> ТҮСІРУ';
         ball.setAttribute('cy', startY);
-        lucide.createIcons();
-      }, 3000);
+      }, 2000);
     }
   }
-  requestAnimationFrame(anim);
+  requestAnimationFrame(step);
+}
+
+const impulseLabState = {
+  m1: 2,
+  v1: 5,
+  m2: 4,
+  type: 'elastic',
+  isSolved: false,
+  feedback: ''
+};
+
+function checkImpulseCalculation() {
+  const input = document.getElementById('imp-calc-p');
+  const feed = document.getElementById('imp-feedback');
+  if (!input || !feed) return;
+
+  const m1 = parseFloat(document.getElementById('m1-range').value);
+  const v1 = parseFloat(document.getElementById('v1-range').value);
+  const correct = m1 * v1;
+  const user = parseFloat(input.value);
+
+  if (Math.abs(correct - user) < 0.1) {
+    impulseLabState.isSolved = true;
+    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Импульс дұрыс есептелді.</div>';
+    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+    if (window.triggerSalute) triggerSalute();
+  } else {
+    feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. p = m · v формуласын қолдан.</div>';
+  }
 }
 
 function renderImpulseLab() {
@@ -1012,88 +1354,77 @@ function renderImpulseLab() {
   }, 100);
 
   return `
-    <div class="glass-panel animate-scale-in" style="padding: 2rem; margin-top: 1rem; border-radius: 32px; border: 1px solid var(--border-glass); background: white;">
-      <!-- Lab Report Header -->
-      <div class="grid gap-6" style="grid-template-columns: 1fr 1fr; margin-bottom: 2rem; background: #f0f9ff; padding: 2rem; border-radius: 24px; border: 1px solid #bae6fd;">
+    <div class="animate-scale-in" style="padding: 1rem;">
+      <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #fdf2f8; padding: 2rem; border-radius: 28px; border: 1.5px solid #fce7f3;">
         <div>
-          <h3 style="color: #0369a1; font-size: 1.5rem; margin-bottom: 1rem; font-weight: 800;">№2</h3>
-          <p style="font-size: 1.1rem; margin-bottom: 0.5rem;"><strong style="color: #0c4a6e;">Тақырыбы:</strong> Денелердің соқтығысуы және импульстің сақталу заңы.</p>
-          <p style="font-size: 1.1rem; margin-bottom: 0.5rem;"><strong style="color: #0c4a6e;">Мақсаты:</strong> Серпімді және серпімсіз соқтығыстар кезінде импульстің сақталуын зерттеу.</p>
-          <div style="background: white; padding: 1rem; border-radius: 12px; border: 1.5px solid #7dd3fc; margin-top: 1rem;">
-             <p style="font-weight: 700; color: #0369a1; margin-bottom: 5px;">Қажетті формулалар:</p>
-             <code style="font-size: 1.2rem; font-weight: 900; color: #0c4a6e;">p = m · v | m₁v₁ + m₂v₂ = m₁v₁' + m₂v₂'</code>
+          <h3 style="color: #9d174d; font-size: 1.6rem; margin-bottom: 1rem; font-weight: 900;">№2: Денелердің соқтығысуы</h3>
+          <p style="font-size: 1.1rem; margin-bottom: 0.8rem;"><strong style="color: #831843;"><i data-lucide="target" size="18" style="vertical-align: middle; margin-right: 8px;"></i> Жұмыс мақсаты:</strong> Соқтығыс кезіндегі импульстің сақталуын зерттеу.</p>
+          <div style="background: white; padding: 1.2rem; border-radius: 16px; border: 1.5px solid #fbcfe8; margin-top: 1rem;">
+             <p style="font-weight: 800; color: #9d174d; margin-bottom: 8px;" class="label-caps">Формула:</p>
+             <div style="font-size: 1.8rem; font-weight: 900; color: #831843;">p = m · v</div>
           </div>
         </div>
-        <div style="background: rgba(255,255,255,0.6); padding: 1.5rem; border-radius: 16px; border: 1px solid #bae6fd;">
-          <h4 style="font-weight: 800; color: #0369a1; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 8px;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-            Жұмыстың орындалу реті:
-          </h4>
-          <ol style="font-size: 0.95rem; line-height: 1.6; color: #0c4a6e; padding-left: 1.2rem;">
-            <li>Денелердің массасын (m₁, m₂) және алғашқы жылдамдығын (v₁) таңдаңыз.</li>
-            <li>Соқтығыс түрін таңдаңыз: <b>Серпімді</b> немесе <b>Серпімсіз</b>.</li>
-            <li>"БАСТАУ" батырмасын басып, нәтижені бақылаңыз.</li>
-            <li>Соқтығысқа дейінгі және кейінгі импульсті салыстырыңыз.</li>
+        <div style="background: rgba(255,255,255,0.7); padding: 1.5rem; border-radius: 20px; border: 1px solid #fce7f3;">
+          <h4 style="font-weight: 800; color: #9d174d; margin-bottom: 1rem;">Жұмыс барысы:</h4>
+          <ol style="font-size: 1rem; line-height: 1.6; color: #831843; padding-left: 1.2rem; font-weight: 600;">
+            <li>Масса мен жылдамдықты таңдаңыз.</li>
+            <li>Импульсті (p = mv) есептеп, мәнін енгізіңіз.</li>
+            <li>"БАСТАУ" басып, соқтығысты бақылаңыз.</li>
           </ol>
         </div>
       </div>
 
-      <!-- Simulation Stage -->
-      <div id="impulse-sim-stage" style="height: 350px; background: #f8fafc; border-radius: 24px; border: 2px solid #e2e8f0; margin-bottom: 2rem; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-         <!-- SVG will be rendered here -->
-      </div>
-
-      <!-- Controls and Simulation Interface -->
-      <div class="flex flex-col gap-8">
-        <div class="glass-panel" style="padding: 2rem; background: #f1f5f9; border-radius: 24px;">
-          <div class="grid gap-8" style="grid-template-columns: 1fr 1fr;">
-            <!-- Ball 1 Controls -->
-            <div>
-              <h5 style="color: #6366f1; font-weight: 800; margin-bottom: 1.5rem; text-transform: uppercase; font-size: 0.85rem;">1-ші дене (Сол жақ)</h5>
-              <div class="flex flex-col gap-4">
-                <div class="flex items-center gap-4">
-                  <span style="width: 80px; font-size: 0.9rem; font-weight: 700;">Масса:</span>
-                  <input type="range" id="m1-range" min="1" max="10" value="2" step="0.5" oninput="updateImpulseSim()" style="flex-grow: 1;">
-                  <span id="m1-val" style="width: 50px; font-weight: 800; color: #6366f1;">2кг</span>
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2.5rem;">
+        <div class="flex flex-col gap-6">
+          <div id="impulse-sim-stage" style="height: 380px; background: #f8fafc; border-radius: 32px; border: 1px solid var(--border-glass); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;"></div>
+          <div class="glass-panel" style="padding: 1.5rem; border-radius: 24px;">
+             <div class="grid grid-cols-2 gap-8">
+               <div class="flex flex-col gap-2">
+                 <span class="label-caps" style="font-weight: 800; color: #6366f1;">m₁ массасы:</span>
+                 <input type="range" id="m1-range" min="1" max="10" value="2" oninput="updateImpulseSim()" style="width: 100%;">
+                 <span id="m1-val" style="font-weight: 800; color: #6366f1;">2кг</span>
+               </div>
+               <div class="flex flex-col gap-2">
+                 <span class="label-caps" style="font-weight: 800; color: #06b6d4;">v₁ жылдамдығы:</span>
+                 <input type="range" id="v1-range" min="1" max="10" value="5" oninput="updateImpulseSim()" style="width: 100%;">
+                 <span id="v1-val" style="font-weight: 800; color: #06b6d4;">5м/с</span>
+               </div>
+             </div>
+             
+             <div class="flex items-center gap-6" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #fbcfe8;">
+                <div class="flex flex-col gap-2" style="flex: 1;">
+                   <span class="label-caps" style="font-weight: 800; color: #06b6d4;">m₂ (Оң жақ):</span>
+                   <input type="range" id="m2-range" min="1" max="10" value="4" oninput="updateImpulseSim()" style="width: 100%;">
+                   <span id="m2-val" style="font-weight: 800; color: #06b6d4;">4кг</span>
                 </div>
-                <div class="flex items-center gap-4">
-                  <span style="width: 80px; font-size: 0.9rem; font-weight: 700;">Жылдамдық:</span>
-                  <input type="range" id="v1-range" min="1" max="10" value="5" step="0.5" oninput="updateImpulseSim()" style="flex-grow: 1;">
-                  <span id="v1-val" style="width: 50px; font-weight: 800; color: #6366f1;">5м/с</span>
+                <div class="flex flex-col gap-2" style="flex: 1;">
+                   <span class="label-caps" style="font-weight: 800;">Түрі:</span>
+                   <select id="collision-type" onchange="updateImpulseSim()" style="padding: 0.6rem; border-radius: 10px; border: 1px solid #cbd5e1; font-weight: 700;">
+                     <option value="elastic">Серпімді</option>
+                     <option value="inelastic">Серпімсіз</option>
+                   </select>
                 </div>
-              </div>
-            </div>
-            <!-- Ball 2 Controls -->
-            <div>
-              <h5 style="color: #06b6d4; font-weight: 800; margin-bottom: 1.5rem; text-transform: uppercase; font-size: 0.85rem;">2-ші дене (Оң жақ)</h5>
-              <div class="flex flex-col gap-4">
-                <div class="flex items-center gap-4">
-                  <span style="width: 80px; font-size: 0.9rem; font-weight: 700;">Масса:</span>
-                  <input type="range" id="m2-range" min="1" max="10" value="4" step="0.5" oninput="updateImpulseSim()" style="flex-grow: 1;">
-                  <span id="m2-val" style="width: 50px; font-weight: 800; color: #06b6d4;">4кг</span>
-                </div>
-                <div style="background: #e2e8f0; padding: 1rem; border-radius: 12px; font-size: 0.85rem; color: #475569; font-weight: 600;">
-                  2-ші дене тыныштықта (v₂ = 0)
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-6" style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #cbd5e1;">
-            <div class="flex items-center gap-3">
-              <span style="font-weight: 800;">Соқтығыс түрі:</span>
-              <select id="collision-type" onchange="updateImpulseSim()" style="padding: 0.6rem 1rem; border-radius: 10px; border: 2px solid #cbd5e1; font-weight: 700; color: var(--text-primary); outline: none;">
-                <option value="elastic">Серпімді</option>
-                <option value="inelastic">Серпімсіз</option>
-              </select>
-            </div>
-            <button id="start-imp-btn" class="btn-primary" style="flex-grow: 1; padding: 1rem; border-radius: 12px; font-size: 1.1rem;" onclick="startImpulseAnim()">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-              БАСТАУ (Run Simulation)
-            </button>
+             </div>
+             <button id="start-imp-btn" class="btn-primary" style="width: 100%; margin-top: 1.5rem; padding: 1rem; border-radius: 12px;" onclick="startImpulseAnim()">БАСТАУ</button>
           </div>
         </div>
 
+        <div class="flex flex-col gap-4">
+          <div class="glass-card" style="padding: 2rem; background: white; border-top: 10px solid #ec4899; border-radius: 28px;">
+            <h4 style="font-weight: 900; color: #9d174d; margin-bottom: 2rem;">ЕСЕПТЕУ</h4>
+            <div class="flex flex-col gap-4">
+               <div style="padding: 1.2rem; background: #fdf2f8; border-radius: 20px; border: 2px solid #fce7f3; text-align: center;">
+                 <p style="font-weight: 800; color: #9d174d; margin-bottom: 0.5rem;" class="label-caps">Импульс (p = m₁v₁):</p>
+                 <div class="flex items-center justify-center gap-2">
+                    <input type="number" id="imp-calc-p" placeholder="???" style="width: 100px; padding: 0.8rem; border-radius: 12px; border: 2px solid #fbcfe8; font-size: 1.2rem; font-weight: 900; text-align: center; color: #be185d;">
+                    <span style="font-size: 1rem; font-weight: 900; color: #9d174d;">кг·м/с</span>
+                 </div>
+                 <button class="btn-primary" style="width: 100%; margin-top: 1rem; background: #ec4899;" onclick="checkImpulseCalculation()">ТЕКСЕРУ</button>
+               </div>
+               <div id="imp-feedback"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   `;
@@ -1230,6 +1561,8 @@ window.startImpulseAnim = function () {
 // Newton 3 Lab State
 let newton3LabState = {
   f: 20,
+  isSolved: false,
+  feedback: '',
   isMoving: false
 };
 
@@ -1240,52 +1573,67 @@ function renderNewton3Lab() {
   }, 100);
 
   return `
-    <div class="glass-panel animate-scale-in" style="padding: 2rem; margin-top: 1rem; border-radius: 32px; border: 1px solid var(--border-glass); background: white;">
-      <div class="grid gap-6" style="grid-template-columns: 1fr 1fr; margin-bottom: 2rem; background: #fff1f2; padding: 2rem; border-radius: 24px; border: 1.5px solid #fecdd3;">
+    <div class="animate-scale-in" style="padding: 1rem;">
+      <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #fff1f2; padding: 2rem; border-radius: 28px; border: 1.5px solid #fecdd3;">
         <div>
-          <h3 style="color: #9f1239; font-size: 1.5rem; margin-bottom: 1rem; font-weight: 800;">№6: Әрекет және қарсы әрекет</h3>
-          <p style="font-size: 1.1rem; margin-bottom: 0.5rem;"><strong style="color: #881337;">Мақсаты:</strong> Денелердің өзара әрекеттесу күштерінің теңдігін бақылау.</p>
-          <div style="background: white; padding: 1rem; border-radius: 12px; border: 1.5px solid #fecdd3; margin-top: 1rem;">
-             <code style="font-size: 1.8rem; font-weight: 900; color: #e11d48;">F₁ = -F₂</code>
+          <h3 style="color: #9f1239; font-size: 1.6rem; margin-bottom: 1rem; font-weight: 900;">№6: Әрекет және қарсы әрекет</h3>
+          <p style="font-size: 1.1rem; margin-bottom: 0.8rem;"><strong style="color: #881337;"><i data-lucide="target" size="18" style="vertical-align: middle; margin-right: 8px;"></i> Жұмыс мақсаты:</strong> Денелердің өзара әрекеттесу күштерінің теңдігін бақылау.</p>
+          <div style="background: white; padding: 1.2rem; border-radius: 16px; border: 1.5px solid #fecdd3; margin-top: 1rem;">
+             <p style="font-weight: 800; color: #9f1239; margin-bottom: 8px;" class="label-caps">Формула:</p>
+             <div style="font-size: 1.8rem; font-weight: 900; color: #e11d48; font-family: 'Outfit', sans-serif;">F₁ = -F₂</div>
           </div>
         </div>
-        <div style="background: rgba(255,255,255,0.6); padding: 1.5rem; border-radius: 16px; border: 1px solid #fecdd3;">
-          <h4 style="font-weight: 800; color: #9f1239; margin-bottom: 0.8rem;">Жұмыс барысы:</h4>
-          <ol style="font-size: 0.95rem; line-height: 1.6; color: #881337; padding-left: 1.2rem;">
-            <li>Өзара әрекеттесу күшін таңдаңыз.</li>
-            <li>"БАСТАУ" басып, екі дененің қалай қозғалатынын бақылаңыз.</li>
-            <li>Екі динамометрдің де бірдей күшті көрсететініне көз жеткізіңіз.</li>
+        <div style="background: rgba(255,255,255,0.7); padding: 1.5rem; border-radius: 20px; border: 1px solid #fecdd3;">
+          <h4 style="font-weight: 800; color: #9f1239; margin-bottom: 1rem;">Жұмыс барысы:</h4>
+          <ol style="font-size: 1rem; line-height: 1.6; color: #881337; padding-left: 1.2rem; font-weight: 600;">
+            <li>Әсер етуші күшті ($F_1$) таңдаңыз.</li>
+            <li>Қарсы әрекет етуші күштің ($F_2$) мәнін жазыңыз.</li>
+            <li>"БАСТАУ" басып, динамометрлерді бақылаңыз.</li>
           </ol>
         </div>
       </div>
 
-      <div id="newton3-sim-stage" style="height: 300px; background: #f8fafc; border-radius: 24px; border: 2px solid #e2e8f0; margin-bottom: 2rem; position: relative;">
-         <!-- SVG -->
-      </div>
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2.5rem;">
+        <div class="flex flex-col gap-6">
+          <div id="newton3-sim-stage" style="height: 350px; background: white; border-radius: 32px; border: 1px solid var(--border-glass); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;"></div>
+          <div class="glass-panel" style="padding: 1.5rem; border-radius: 24px;">
+             <div class="flex flex-col gap-4">
+               <span class="label-caps" style="font-weight: 800; color: #9f1239;">Әсер етуші күш (F₁):</span>
+               <input type="range" id="n3-f-range" min="10" max="100" step="10" value="20" oninput="updateNewton3Value()" style="width: 100%;">
+               <div class="flex justify-between font-bold" style="color: #e11d48;">
+                   <span>10 Н</span>
+                   <span id="n3-f-val">20 Н</span>
+                   <span>100 Н</span>
+               </div>
+               <button id="n3-start-btn" class="btn-primary" style="width: 100%; margin-top: 1rem; padding: 1rem; border-radius: 12px; background: #e11d48;" onclick="startNewton3Anim()">БАСТАУ</button>
+             </div>
+          </div>
+        </div>
 
-      <div class="glass-panel" style="padding: 2rem; background: #fff1f2; border-radius: 24px;">
-        <div class="flex justify-between items-center gap-8">
-          <div class="flex flex-col gap-2 flex-grow">
-            <span class="label-caps" style="font-weight: 800; color: #9f1239;">Әсер етуші күш (F):</span>
-            <input type="range" min="10" max="100" value="20" oninput="updateNewton3Value(this.value)" style="width: 100%;">
-            <div class="flex justify-between font-bold" style="color: #e11d48;">
-              <span>10 Н</span>
-              <span id="n3-f-val">20 Н</span>
-              <span>100 Н</span>
+        <div class="flex flex-col gap-4">
+          <div class="glass-card" style="padding: 2rem; background: white; border-top: 10px solid #e11d48; border-radius: 28px;">
+            <h4 style="font-weight: 900; color: #9f1239; margin-bottom: 2rem;">КҮШТІ ТЕКСЕРУ</h4>
+            <div class="flex flex-col gap-4">
+               <div style="padding: 1.2rem; background: #fff1f2; border-radius: 20px; border: 2px solid #fecdd3; text-align: center;">
+                 <p style="font-weight: 800; color: #9f1239; margin-bottom: 0.5rem;" class="label-caps">Қарсы әрекет күші (F₂):</p>
+                 <div class="flex items-center justify-center gap-2">
+                    <input type="number" id="n3-calc-f" placeholder="???" style="width: 100px; padding: 0.8rem; border-radius: 12px; border: 2px solid #fda4af; font-size: 1.2rem; font-weight: 900; text-align: center; color: #e11d48;">
+                    <span style="font-size: 1.2rem; font-weight: 900; color: #9f1239;">Н</span>
+                 </div>
+                 <button class="btn-primary" style="width: 100%; margin-top: 1rem; background: #e11d48;" onclick="checkNewton3Calculation()">ТЕКСЕРУ</button>
+               </div>
+               <div id="n3-feedback"></div>
             </div>
           </div>
-          <button class="btn-primary" onclick="startNewton3Anim()" id="n3-start-btn" style="background: #e11d48; border-radius: 12px; padding: 1rem 3rem;">
-             БАСТАУ
-          </button>
         </div>
       </div>
     </div>
   `;
 }
 
-function updateNewton3Value(val) {
-  newton3LabState.f = parseFloat(val);
-  document.getElementById('n3-f-val').innerText = `${val} Н`;
+function updateNewton3Value() {
+  newton3LabState.f = parseFloat(document.getElementById('n3-f-range').value);
+  document.getElementById('n3-f-val').innerText = newton3LabState.f + " Н";
   updateNewton3Sim();
 }
 
@@ -1294,27 +1642,21 @@ function updateNewton3Sim() {
   if (!stage) return;
 
   stage.innerHTML = `
-    <svg width="100%" height="100%" viewBox="0 0 800 300">
+    <svg width="100%" height="100%" viewBox="0 0 800 350">
       <line x1="100" y1="220" x2="700" y2="220" stroke="#94a3b8" stroke-width="2" />
-      
-      <!-- Skater 1 -->
       <g id="n3-s1" transform="translate(340, 160)">
          <rect x="0" y="0" width="60" height="50" rx="4" fill="#6366f1" />
          <circle cx="15" cy="55" r="8" fill="#1e293b" />
          <circle cx="45" cy="55" r="8" fill="#1e293b" />
          <text x="30" y="30" text-anchor="middle" fill="white" font-weight="900">m₁</text>
-         <!-- Gauge 1 -->
          <rect x="60" y="20" width="60" height="10" fill="#cbd5e1" />
          <text x="90" y="15" text-anchor="middle" font-size="12" font-weight="900" fill="#6366f1">-${newton3LabState.f} Н</text>
       </g>
-
-      <!-- Skater 2 -->
       <g id="n3-s2" transform="translate(400, 160)">
          <rect x="0" y="0" width="60" height="50" rx="4" fill="#ec4899" />
          <circle cx="15" cy="55" r="8" fill="#1e293b" />
          <circle cx="45" cy="55" r="8" fill="#1e293b" />
          <text x="30" y="30" text-anchor="middle" fill="white" font-weight="900">m₂</text>
-         <!-- Gauge 2 -->
          <rect x="-60" y="20" width="60" height="10" fill="#cbd5e1" />
          <text x="-30" y="15" text-anchor="middle" font-size="12" font-weight="900" fill="#ec4899">+${newton3LabState.f} Н</text>
       </g>
@@ -1322,16 +1664,34 @@ function updateNewton3Sim() {
   `;
 }
 
-function startNewton3Anim() {
-  if (newton3LabState.isMoving) return;
-  newton3LabState.isMoving = true;
-  document.getElementById('n3-start-btn').disabled = true;
+function checkNewton3Calculation() {
+  const input = document.getElementById('n3-calc-f');
+  const feed = document.getElementById('n3-feedback');
+  if (!input || !feed) return;
 
+  const correct = newton3LabState.f;
+  const user = Math.abs(parseFloat(input.value));
+
+  if (correct === user) {
+    newton3LabState.isSolved = true;
+    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Әрекет қарсы әрекетке тең.</div>';
+    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+    if (window.triggerSalute) triggerSalute();
+  } else {
+    feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. Күштердің модулі тең болуы керек.</div>';
+  }
+}
+
+function startNewton3Anim() {
   const s1 = document.getElementById('n3-s1');
   const s2 = document.getElementById('n3-s2');
+  const btn = document.getElementById('n3-start-btn');
+  if (!s1 || !s2 || !btn || btn.disabled) return;
+
+  btn.disabled = true;
   let x1 = 340, x2 = 400;
   let v1 = 0, v2 = 0;
-  const a = newton3LabState.f / 10; // F/m where m=10
+  const a = newton3LabState.f / 10;
 
   function step() {
     v1 -= a * 0.016;
@@ -1339,9 +1699,11 @@ function startNewton3Anim() {
     x1 += v1;
     x2 += v2;
     if (x1 < 50 || x2 > 700) {
-      newton3LabState.isMoving = false;
-      document.getElementById('n3-start-btn').disabled = false;
-      if (window.triggerSalute) triggerSalute();
+      btn.disabled = false;
+      setTimeout(() => {
+        s1.setAttribute('transform', 'translate(340, 160)');
+        s2.setAttribute('transform', 'translate(400, 160)');
+      }, 2000);
       return;
     }
     s1.setAttribute('transform', `translate(${x1}, 160)`);
@@ -1365,63 +1727,79 @@ function renderGravityLab() {
   }, 100);
 
   return `
-    <div class="glass-panel animate-scale-in" style="padding: 2rem; margin-top: 1rem; border-radius: 32px; border: 1px solid var(--border-glass); background: white;">
-      <div class="grid gap-6" style="grid-template-columns: 1fr 1fr; margin-bottom: 2rem; background: #faf5ff; padding: 2rem; border-radius: 24px; border: 1.5px solid #f3e8ff;">
+    <div class="animate-scale-in" style="padding: 1rem;">
+      <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #faf5ff; padding: 2rem; border-radius: 28px; border: 1.5px solid #f3e8ff;">
         <div>
-          <h3 style="color: #7e22ce; font-size: 1.5rem; margin-bottom: 1rem; font-weight: 800;">№7: Бүкіләлемдік тартылыс</h3>
-          <p style="font-size: 1.1rem; margin-bottom: 0.5rem;"><strong style="color: #6b21a8;">Мақсаты:</strong> Тартылыс күшінің масса мен қашықтыққа тәуелділігін зерттеу.</p>
-          <div style="background: white; padding: 1rem; border-radius: 12px; border: 1.5px solid #e9d5ff; margin-top: 1rem;">
-             <code style="font-size: 1.4rem; font-weight: 900; color: #9333ea;">F = G · (m₁m₂) / r²</code>
+          <h3 style="color: #7e22ce; font-size: 1.6rem; margin-bottom: 1rem; font-weight: 900;">№7: Бүкіләлемдік тартылыс</h3>
+          <p style="font-size: 1.1rem; margin-bottom: 0.8rem;"><strong style="color: #6b21a8;"><i data-lucide="target" size="18" style="vertical-align: middle; margin-right: 8px;"></i> Жұмыс мақсаты:</strong> Тартылыс күшінің масса мен қашықтыққа тәуелділігін зерттеу.</p>
+          <div style="background: white; padding: 1.2rem; border-radius: 16px; border: 1.5px solid #e9d5ff; margin-top: 1rem;">
+             <p style="font-weight: 800; color: #7e22ce; margin-bottom: 8px;" class="label-caps">Формула (G≈1):</p>
+             <div style="font-size: 1.8rem; font-weight: 900; color: #9333ea; font-family: 'Outfit', sans-serif;">F = (m₁ · m₂) / r²</div>
           </div>
         </div>
-        <div style="background: rgba(255,255,255,0.6); padding: 1.5rem; border-radius: 16px; border: 1px solid #f3e8ff;">
-          <h4 style="font-weight: 800; color: #7e22ce; margin-bottom: 0.8rem;">Жұмыс барысы:</h4>
-          <ol style="font-size: 0.95rem; line-height: 1.6; color: #6b21a8; padding-left: 1.2rem;">
-            <li>Планеталардың массасын өзгертіңіз.</li>
-            <li>Олардың арақашықтығын реттеңіз.</li>
-            <li>Тартылыс күшінің қалай өзгеретінін бақылаңыз.</li>
+        <div style="background: rgba(255,255,255,0.7); padding: 1.5rem; border-radius: 20px; border: 1px solid #f3e8ff;">
+          <h4 style="font-weight: 800; color: #7e22ce; margin-bottom: 1rem;">Жұмыс барысы:</h4>
+          <ol style="font-size: 1rem; line-height: 1.6; color: #6b21a8; padding-left: 1.2rem; font-weight: 600;">
+            <li>Массаларды ($m_1, m_2$) және қашықтықты ($r$) таңдаңыз.</li>
+            <li>Күшті ($F = \frac{m_1 m_2}{r^2}$) есептеп, мәнін енгізіңіз.</li>
+            <li>"ТЕКСЕРУ" басып, нәтижені көріңіз.</li>
           </ol>
         </div>
       </div>
 
-      <div id="gravity-sim-stage" style="height: 350px; background: radial-gradient(circle, #1e1b4b, #0f172a); border-radius: 24px; border: 1px solid #334155; margin-bottom: 2rem; position: relative;">
-         <!-- SVG planets -->
-      </div>
-
-      <div class="glass-panel" style="padding: 2rem; background: #faf5ff; border-radius: 24px;">
-        <div class="grid gap-8" style="grid-template-columns: 1fr 1fr 1fr;">
-          <div class="flex flex-col gap-2">
-            <span class="label-caps" style="font-weight: 800; color: #7e22ce;">m₁ массасы:</span>
-            <input type="range" min="10" max="500" value="100" oninput="updateGravityValue('m1', this.value)" style="width: 100%;">
-            <span id="grav-m1" style="font-weight: 800; color: #9333ea;">100 x 10²⁴ кг</span>
-          </div>
-          <div class="flex flex-col gap-2">
-            <span class="label-caps" style="font-weight: 800; color: #7e22ce;">m₂ массасы:</span>
-            <input type="range" min="10" max="500" value="100" oninput="updateGravityValue('m2', this.value)" style="width: 100%;">
-            <span id="grav-m2" style="font-weight: 800; color: #9333ea;">100 x 10²⁴ кг</span>
-          </div>
-          <div class="flex flex-col gap-2">
-            <span class="label-caps" style="font-weight: 800; color: #7e22ce;">Арақашықтық (r):</span>
-            <input type="range" min="100" max="500" value="200" oninput="updateGravityValue('dist', this.value)" style="width: 100%;">
-            <span id="grav-dist" style="font-weight: 800; color: #9333ea;">200 x 10⁶ м</span>
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2.5rem;">
+        <div class="flex flex-col gap-6">
+          <div id="gravity-sim-stage" style="height: 380px; background: #0c0a09; border-radius: 32px; border: 1px solid #2e1065; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;"></div>
+          <div class="glass-panel" style="padding: 1.5rem; border-radius: 24px;">
+             <div class="grid grid-cols-3 gap-6">
+               <div class="flex flex-col gap-2">
+                 <span class="label-caps" style="font-weight: 800; color: #7e22ce;">m1 (кг):</span>
+                 <input type="range" id="grav-m1-range" min="10" max="200" step="10" value="100" oninput="updateGravityValue()" style="width: 100%;">
+                 <span id="grav-m1-v" style="font-weight: 800; color: #9333ea;">100 кг</span>
+               </div>
+               <div class="flex flex-col gap-2">
+                 <span class="label-caps" style="font-weight: 800; color: #7e22ce;">m2 (кг):</span>
+                 <input type="range" id="grav-m2-range" min="10" max="200" step="10" value="100" oninput="updateGravityValue()" style="width: 100%;">
+                 <span id="grav-m2-v" style="font-weight: 800; color: #9333ea;">100 кг</span>
+               </div>
+               <div class="flex flex-col gap-2">
+                 <span class="label-caps" style="font-weight: 800; color: #7e22ce;">r (м):</span>
+                 <input type="range" id="grav-dist-range" min="50" max="300" step="10" value="100" oninput="updateGravityValue()" style="width: 100%;">
+                 <span id="grav-dist-v" style="font-weight: 800; color: #9333ea;">100 м</span>
+               </div>
+             </div>
           </div>
         </div>
-        <div id="grav-force-data" style="margin-top: 1.5rem; text-align: center; color: #6b21a8; font-size: 1.5rem; font-weight: 900; background: white; padding: 1rem; border-radius: 12px; border: 2px solid #e9d5ff;">
-           Тартылыс күші (F): 1.67 x 10¹⁸ Н
+
+        <div class="flex flex-col gap-4">
+          <div class="glass-card" style="padding: 2rem; background: white; border-top: 10px solid #9333ea; border-radius: 28px;">
+            <h4 style="font-weight: 900; color: #6b21a8; margin-bottom: 2rem;">КҮШТІ ЕСЕПТЕУ</h4>
+            <div class="flex flex-col gap-4">
+               <div style="padding: 1.2rem; background: #faf5ff; border-radius: 20px; border: 2px solid #f3e8ff; text-align: center;">
+                 <p style="font-weight: 800; color: #7e22ce; margin-bottom: 0.5rem;" class="label-caps">Тартылыс күші (F):</p>
+                 <div class="flex items-center justify-center gap-2">
+                    <input type="number" id="grav-calc-f" placeholder="???" style="width: 100px; padding: 0.8rem; border-radius: 12px; border: 2px solid #d8b4fe; font-size: 1.2rem; font-weight: 900; text-align: center; color: #7e22ce;">
+                    <span style="font-size: 1.2rem; font-weight: 900; color: #9333ea;">Н</span>
+                 </div>
+                 <button class="btn-primary" style="width: 100%; margin-top: 1rem; background: #9333ea;" onclick="checkGravityCalculation()">ТЕКСЕРУ</button>
+               </div>
+               <div id="grav-feedback"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   `;
 }
 
-function updateGravityValue(prop, val) {
-  gravityLabState[prop] = parseFloat(val);
-  if (prop === 'm1') document.getElementById('grav-m1').innerText = `${val} x 10²⁴ кг`;
-  if (prop === 'm2') document.getElementById('grav-m2').innerText = `${val} x 10²⁴ кг`;
-  if (prop === 'dist') document.getElementById('grav-dist').innerText = `${val} x 10⁶ м`;
+function updateGravityValue() {
+  gravityLabState.m1 = parseFloat(document.getElementById('grav-m1-range').value);
+  gravityLabState.m2 = parseFloat(document.getElementById('grav-m2-range').value);
+  gravityLabState.dist = parseFloat(document.getElementById('grav-dist-range').value);
 
-  const F = (6.67 * gravityLabState.m1 * gravityLabState.m2) / (gravityLabState.dist * gravityLabState.dist);
-  document.getElementById('grav-force-data').innerText = `Тартылыс күші (F) = ${F.toFixed(2)} x 10¹⁸ Н`;
+  document.getElementById('grav-m1-v').innerText = gravityLabState.m1 + " кг";
+  document.getElementById('grav-m2-v').innerText = gravityLabState.m2 + " кг";
+  document.getElementById('grav-dist-v').innerText = gravityLabState.dist + " м";
   updateGravitySim();
 }
 
@@ -1429,61 +1807,58 @@ function updateGravitySim() {
   const stage = document.getElementById('gravity-sim-stage');
   if (!stage) return;
 
-  const mid = 400;
-  const d = gravityLabState.dist / 2;
-  const r1 = 15 + gravityLabState.m1 / 20;
-  const r2 = 15 + gravityLabState.m2 / 20;
+  const r1 = Math.sqrt(gravityLabState.m1) * 2;
+  const r2 = Math.sqrt(gravityLabState.m2) * 2;
+  const cx = 400;
+  const cy = 190;
+  const offset = gravityLabState.dist / 2;
 
   stage.innerHTML = `
-    <svg width="100%" height="100%" viewBox="0 0 800 350">
-      <!-- Star background -->
-      ${Array.from({ length: 50 }).map(() => `
-        <circle cx="${Math.random() * 800}" cy="${Math.random() * 350}" r="${Math.random() * 1.5}" fill="white" opacity="${Math.random()}" />
-      `).join('')}
-
-      <!-- Planet 1 -->
-      <g transform="translate(${mid - d}, 175)">
-        <circle r="${r1}" fill="url(#grad1)" />
-        <defs>
-          <radialGradient id="grad1">
-            <stop offset="0%" stop-color="#3b82f6" />
-            <stop offset="100%" stop-color="#1d4ed8" />
-          </radialGradient>
-        </defs>
-      </g>
-
-      <!-- Planet 2 -->
-      <g transform="translate(${mid + d}, 175)">
-        <circle r="${r2}" fill="url(#grad2)" />
-        <defs>
-          <radialGradient id="grad2">
-            <stop offset="0%" stop-color="#ec4899" />
-            <stop offset="100%" stop-color="#be185d" />
-          </radialGradient>
-        </defs>
-      </g>
-
-      <!-- Force Arrows -->
-      <path d="M ${mid - d + r1 + 5} 175 L ${mid - d + r1 + 40} 175 M ${mid - d + r1 + 40} 175 L ${mid - d + r1 + 30} 165 M ${mid - d + r1 + 40} 175 L ${mid - d + r1 + 30} 185" stroke="#facc15" stroke-width="3" />
-      <path d="M ${mid + d - r2 - 5} 175 L ${mid + d - r2 - 40} 175 M ${mid + d - r2 - 40} 175 L ${mid + d - r2 - 30} 165 M ${mid + d - r2 - 40} 175 L ${mid + d - r2 - 30} 185" stroke="#facc15" stroke-width="3" />
+    <svg width="100%" height="100%" viewBox="0 0 800 380">
+      <defs>
+        <radialGradient id="gradPlanet1">
+          <stop offset="0%" stop-color="#3b82f6" />
+          <stop offset="100%" stop-color="#1d4ed8" />
+        </radialGradient>
+        <radialGradient id="gradPlanet2">
+          <stop offset="0%" stop-color="#ec4899" />
+          <stop offset="100%" stop-color="#be185d" />
+        </radialGradient>
+      </defs>
+      <circle cx="${cx - offset}" cy="${cy}" r="${r1}" fill="url(#gradPlanet1)" />
+      <circle cx="${cx + offset}" cy="${cy}" r="${r2}" fill="url(#gradPlanet2)" />
+      <line x1="${cx - offset}" y1="${cy + 50}" x2="${cx + offset}" y2="${cy + 50}" stroke="#a78bfa" stroke-width="2" stroke-dasharray="5,5" />
+      <text x="${cx}" y="${cy + 70}" text-anchor="middle" fill="#a78bfa" font-weight="800">r = ${gravityLabState.dist} м</text>
     </svg>
   `;
+}
+
+function checkGravityCalculation() {
+  const input = document.getElementById('grav-calc-f');
+  const feed = document.getElementById('grav-feedback');
+  if (!input || !feed) return;
+
+  const correct = (gravityLabState.m1 * gravityLabState.m2) / Math.pow(gravityLabState.dist, 2);
+  const user = parseFloat(input.value);
+
+  if (Math.abs(correct - user) / (correct || 1) < 0.1) {
+    gravityLabState.isSolved = true;
+    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Тартылыс күші есептелді.</div>';
+    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+    if (window.triggerSalute) triggerSalute();
+  } else {
+    feed.innerHTML = `<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. (m₁·m₂)/r² екенін ұмытпа. Жауап: ${correct.toFixed(3)}</div>`;
+  }
 }
 
 
 // Density Lab State
 let densityLabState = {
   material: 'gold',
-  mass: 193, // grams
-  volume: 10, // cm3
-  isSubmerged: false
-};
-
-const densityData = {
-  gold: { density: 19.3, color: '#facc15', name: 'Алтын' },
-  iron: { density: 7.8, color: '#94a3b8', name: 'Темір' },
-  wood: { density: 0.7, color: '#b45309', name: 'Ағаш' },
-  aluminum: { density: 2.7, color: '#cbd5e1', name: 'Алюминий' }
+  mass: 193,
+  volume: 10,
+  isSolved: false,
+  feedback: ''
 };
 
 function renderDensityLab() {
@@ -1493,49 +1868,63 @@ function renderDensityLab() {
   }, 100);
 
   return `
-    <div class="glass-panel animate-scale-in" style="padding: 2rem; margin-top: 1rem; border-radius: 32px; border: 1px solid var(--border-glass); background: white;">
-      <div class="grid gap-6" style="grid-template-columns: 1fr 1fr; margin-bottom: 2rem; background: #eff6ff; padding: 2rem; border-radius: 24px; border: 1.5px solid #dbeafe;">
+    <div class="animate-scale-in" style="padding: 1rem;">
+      <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #eff6ff; padding: 2rem; border-radius: 28px; border: 1.5px solid #dbeafe;">
         <div>
-          <h3 style="color: #1e40af; font-size: 1.5rem; margin-bottom: 1rem; font-weight: 800;">№8: Заттың тығыздығы</h3>
-          <p style="font-size: 1.1rem; margin-bottom: 0.5rem;"><strong style="color: #1e3a8a;">Мақсаты:</strong> Заттың массасы мен көлемін өлшеу арқылы оның тығыздығын анықтау.</p>
-          <div style="background: white; padding: 1rem; border-radius: 12px; border: 1.5px solid #bfdbfe; margin-top: 1rem;">
-             <code style="font-size: 1.8rem; font-weight: 900; color: #3b82f6;">ρ = m / V</code>
+          <h3 style="color: #1e40af; font-size: 1.6rem; margin-bottom: 1rem; font-weight: 900;">№8: Заттың тығыздығы</h3>
+          <p style="font-size: 1.1rem; margin-bottom: 0.8rem;"><strong style="color: #1e3a8a;"><i data-lucide="target" size="18" style="vertical-align: middle; margin-right: 8px;"></i> Жұмыс мақсаты:</strong> Масса мен көлем арқылы тығыздықты анықтау.</p>
+          <div style="background: white; padding: 1.2rem; border-radius: 16px; border: 1.5px solid #bfdbfe; margin-top: 1rem;">
+             <p style="font-weight: 800; color: #1e40af; margin-bottom: 8px;" class="label-caps">Формула:</p>
+             <div style="font-size: 1.8rem; font-weight: 900; color: #3b82f6; font-family: 'Outfit', sans-serif;">ρ = m / V</div>
           </div>
         </div>
-        <div style="background: rgba(255,255,255,0.6); padding: 1.5rem; border-radius: 16px; border: 1px solid #dbeafe;">
-          <h4 style="font-weight: 800; color: #1e40af; margin-bottom: 0.8rem;">Жұмыс барысы:</h4>
-          <ol style="font-size: 0.95rem; line-height: 1.6; color: #1e3a8a; padding-left: 1.2rem;">
-            <li>Зерттелетін материалды таңдаңыз.</li>
-            <li>Материалды суға батырып, көлемін анықтаңыз (ығыстырылған су).</li>
-            <li>Массаны көлемге бөліп, тығыздығын есептеңіз.</li>
+        <div style="background: rgba(255,255,255,0.7); padding: 1.5rem; border-radius: 20px; border: 1px solid #dbeafe;">
+          <h4 style="font-weight: 800; color: #1e40af; margin-bottom: 1rem;">Жұмыс барысы:</h4>
+          <ol style="font-size: 1rem; line-height: 1.6; color: #1e3a8a; padding-left: 1.2rem; font-weight: 600;">
+            <li>Материалды таңдап, көлемін ($V$) реттеңіз.</li>
+            <li>Тығыздықты ($\rho = m/V$) есептеп, мәнін енгізіңіз.</li>
+            <li>"ТЕКСЕРУ" басып, нәтижені көріңіз.</li>
           </ol>
         </div>
       </div>
 
-      <div id="density-sim-stage" style="height: 350px; background: #f8fafc; border-radius: 24px; border: 2px solid #e2e8f0; margin-bottom: 2rem; position: relative;">
-         <!-- SVG -->
-      </div>
-
-      <div class="glass-panel" style="padding: 2rem; background: #eff6ff; border-radius: 24px;">
-        <div class="grid gap-8" style="grid-template-columns: 1fr 1fr 1fr;">
-          <div class="flex flex-col gap-3">
-            <span class="label-caps" style="font-weight: 800; color: #1e40af;">Материал:</span>
-            <select onchange="updateDensityValue('material', this.value)" style="padding: 0.8rem; border-radius: 12px; border: 2px solid #bfdbfe; font-weight: 700;">
-              <option value="gold">Алтын</option>
-              <option value="iron">Темір</option>
-              <option value="wood">Ағаш</option>
-              <option value="aluminum">Алюминий</option>
-            </select>
-          </div>
-          <div class="flex flex-col gap-2">
-            <span class="label-caps" style="font-weight: 800; color: #1e40af;">Көлем (V):</span>
-            <input type="range" min="5" max="50" value="10" oninput="updateDensityValue('volume', this.value)" style="width: 100%;">
-            <span id="dens-v-val" style="font-weight: 800; color: #3b82f6;">10 см³</span>
-          </div>
-          <div class="flex flex-col gap-2">
-             <div id="dens-m-val" style="font-weight: 900; color: #1e3a8a; font-size: 1.2rem; text-align: center; background: white; padding: 1rem; border-radius: 12px; border: 2px solid #bfdbfe;">
-                m = 193 г
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2.5rem;">
+        <div class="flex flex-col gap-6">
+          <div id="density-sim-stage" style="height: 380px; background: white; border-radius: 32px; border: 1px solid var(--border-glass); position: relative; overflow: hidden; display: flex; align-items: flex-end; justify-content: center;"></div>
+          <div class="glass-panel" style="padding: 1.5rem; border-radius: 24px;">
+             <div class="grid grid-cols-2 gap-8">
+               <div class="flex flex-col gap-2">
+                 <span class="label-caps" style="font-weight: 800; color: #1e40af;">Материал:</span>
+                 <select id="dens-mat-select" onchange="updateDensityValue()" style="padding: 0.6rem; border-radius: 10px; border: 1px solid #bfdbfe; font-weight: 700;">
+                    <option value="gold">Алтын (m = 19.3V)</option>
+                    <option value="iron">Темір (m = 7.8V)</option>
+                    <option value="wood">Ағаш (m = 0.7V)</option>
+                 </select>
+               </div>
+               <div class="flex flex-col gap-2">
+                 <span class="label-caps" style="font-weight: 800; color: #1e40af;">Көлем (V):</span>
+                 <input type="range" id="dens-vol-range" min="10" max="50" step="10" value="10" oninput="updateDensityValue()" style="width: 100%;">
+                 <span id="dens-vol-v" style="font-weight: 800; color: #3b82f6;">10 см³</span>
+               </div>
              </div>
+             <div id="dens-mass-display" style="margin-top: 1rem; text-align: center; font-weight: 900; color: #1e3a8a; font-size: 1.2rem;">m = 193 г</div>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-4">
+          <div class="glass-card" style="padding: 2rem; background: white; border-top: 10px solid #3b82f6; border-radius: 28px;">
+            <h4 style="font-weight: 900; color: #1e40af; margin-bottom: 2rem;">ТЫҒЫЗДЫҚТЫ ЕСЕПТЕУ</h4>
+            <div class="flex flex-col gap-4">
+               <div style="padding: 1.2rem; background: #eff6ff; border-radius: 20px; border: 2px solid #dbeafe; text-align: center;">
+                 <p style="font-weight: 800; color: #1e40af; margin-bottom: 0.5rem;" class="label-caps">Тығыздық (г/см³):</p>
+                 <div class="flex items-center justify-center gap-2">
+                    <input type="number" id="dens-calc-rho" placeholder="???" style="width: 100px; padding: 0.8rem; border-radius: 12px; border: 2px solid #bfdbfe; font-size: 1.2rem; font-weight: 900; text-align: center; color: #1e40af;">
+                    <span style="font-size: 1.2rem; font-weight: 900; color: #3b82f6;">г/см³</span>
+                 </div>
+                 <button class="btn-primary" style="width: 100%; margin-top: 1rem; background: #3b82f6;" onclick="checkDensityCalculation()">ТЕКСЕРУ</button>
+               </div>
+               <div id="dens-feedback"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -1543,52 +1932,63 @@ function renderDensityLab() {
   `;
 }
 
-function updateDensityValue(prop, val) {
-  if (prop === 'material') densityLabState.material = val;
-  if (prop === 'volume') densityLabState.volume = parseFloat(val);
+function updateDensityValue() {
+  const mat = document.getElementById('dens-mat-select').value;
+  const vol = parseFloat(document.getElementById('dens-vol-range').value);
+  const densities = { gold: 19.3, iron: 7.8, wood: 0.7 };
 
-  const d = densityData[densityLabState.material].density;
-  densityLabState.mass = (d * densityLabState.volume).toFixed(1);
+  densityLabState.material = mat;
+  densityLabState.volume = vol;
+  densityLabState.mass = (densities[mat] * vol).toFixed(1);
 
-  const mVal = document.getElementById('dens-m-val');
-  if (mVal) mVal.innerText = `m = ${densityLabState.mass} г`;
-  const vVal = document.getElementById('dens-v-val');
-  if (vVal) vVal.innerText = `${densityLabState.volume} см³`;
-
+  document.getElementById('dens-vol-v').innerText = vol + " см³";
+  document.getElementById('dens-mass-display').innerText = `m = ${densityLabState.mass} г`;
   updateDensitySim();
 }
 
 function updateDensitySim() {
   const stage = document.getElementById('density-sim-stage');
   if (!stage) return;
-
-  const mat = densityData[densityLabState.material];
-  const size = Math.pow(densityLabState.volume, 1 / 3) * 20;
+  const color = densityLabState.material === 'gold' ? '#facc15' : densityLabState.material === 'iron' ? '#94a3b8' : '#b45309';
+  const size = Math.pow(densityLabState.volume, 1 / 3) * 25;
 
   stage.innerHTML = `
     <svg width="100%" height="100%" viewBox="0 0 800 350">
-      <!-- Water Tank -->
       <rect x="300" y="100" width="200" height="200" fill="#bae6fd" opacity="0.6" stroke="#0ea5e9" stroke-width="2" />
-      <text x="400" y="320" text-anchor="middle" font-weight="800" fill="#0369a1">Су (V₀ = 500 мл)</text>
-      
-      <!-- Overflow sprout -->
       <path d="M 500 120 L 530 120 L 530 250" fill="none" stroke="#0ea5e9" stroke-width="8" stroke-linecap="round" />
-      
-      <!-- Measuring cup -->
       <rect x="510" y="250" width="40" height="50" fill="#bae6fd" opacity="0.6" stroke="#0ea5e9" stroke-width="2" />
-      <text x="530" y="315" text-anchor="middle" font-size="10" fill="#0369a1">Төгілген: ${densityLabState.volume} мл</text>
-
-      <!-- Object -->
-      <rect x="${400 - size / 2}" y="${220 - size}" width="${size}" height="${size}" fill="${mat.color}" rx="4" stroke="rgba(0,0,0,0.1)" />
-      <text x="400" y="${220 - size - 10}" text-anchor="middle" font-size="12" font-weight="900" fill="${mat.color}">${mat.name}</text>
+      <rect x="${400 - size / 2}" y="${300 - size}" width="${size}" height="${size}" fill="${color}" rx="4" stroke="rgba(0,0,0,0.1)" />
+      <text x="400" y="${300 - size - 10}" text-anchor="middle" font-size="12" font-weight="900" fill="${color}">${densityLabState.material.toUpperCase()}</text>
     </svg>
   `;
 }
 
+function checkDensityCalculation() {
+  const input = document.getElementById('dens-calc-rho');
+  const feed = document.getElementById('dens-feedback');
+  if (!input || !feed) return;
+
+  const densities = { gold: 19.3, iron: 7.8, wood: 0.7 };
+  const correct = densities[densityLabState.material];
+  const user = parseFloat(input.value);
+
+  if (Math.abs(correct - user) < 0.1) {
+    densityLabState.isSolved = true;
+    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Тығыздық анықталды.</div>';
+    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+    if (window.triggerSalute) triggerSalute();
+  } else {
+    feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. ρ = m / V формуласын қолдан.</div>';
+  }
+}
+
+// Pressure Lab State
 // Pressure Lab State
 let pressureLabState = {
   force: 50,
-  area: 1 // 1: small, 2: medium, 3: large
+  area: 1,
+  isSolved: false,
+  feedback: ''
 };
 
 function renderPressureLab() {
@@ -1598,97 +1998,119 @@ function renderPressureLab() {
   }, 100);
 
   return `
-    <div class="glass-panel animate-scale-in" style="padding: 2rem; margin-top: 1rem; border-radius: 32px; border: 1px solid var(--border-glass); background: white;">
-      <div class="grid gap-6" style="grid-template-columns: 1fr 1fr; margin-bottom: 2rem; background: #fff7ed; padding: 2rem; border-radius: 24px; border: 1.5px solid #ffedd5;">
+    <div class="animate-scale-in" style="padding: 1rem;">
+      <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #fff7ed; padding: 2rem; border-radius: 28px; border: 1.5px solid #ffedd5;">
         <div>
-          <h3 style="color: #9a3412; font-size: 1.5rem; margin-bottom: 1rem; font-weight: 800;">№9: Қысымды зерттеу</h3>
-          <p style="font-size: 1.1rem; margin-bottom: 0.5rem;"><strong style="color: #7c2d12;">Мақсаты:</strong> Күш пен ауданның қысымға (батыру тереңдігіне) әсерін бақылау.</p>
-          <div style="background: white; padding: 1rem; border-radius: 12px; border: 1.5px solid #fed7aa; margin-top: 1rem;">
-             <code style="font-size: 1.8rem; font-weight: 900; color: #f97316;">p = F / S</code>
+          <h3 style="color: #9a3412; font-size: 1.6rem; margin-bottom: 1rem; font-weight: 900;">№9: Қысымды зерттеу</h3>
+          <p style="font-size: 1.1rem; margin-bottom: 0.8rem;"><strong style="color: #7c2d12;"><i data-lucide="target" size="18" style="vertical-align: middle; margin-right: 8px;"></i> Жұмыс мақсаты:</strong> Күш пен ауданның қысымға әсерін зерттеу.</p>
+          <div style="background: white; padding: 1.2rem; border-radius: 16px; border: 1.5px solid #ffedd5; margin-top: 1rem;">
+             <p style="font-weight: 800; color: #9a3412; margin-bottom: 8px;" class="label-caps">Формула:</p>
+             <div style="font-size: 1.8rem; font-weight: 900; color: #f97316; font-family: 'Outfit', sans-serif;">P = F / S</div>
           </div>
         </div>
-        <div style="background: rgba(255,255,255,0.6); padding: 1.5rem; border-radius: 16px; border: 1px solid #ffedd5;">
-          <h4 style="font-weight: 800; color: #9a3412; margin-bottom: 0.8rem;">Жұмыс барысы:</h4>
-          <ol style="font-size: 0.95rem; line-height: 1.6; color: #7c2d12; padding-left: 1.2rem;">
-            <li>Денеге түсетін күшті (салмақты) өзгертіңіз.</li>
-            <li>Дененің жағын өзгертіп, тіреу ауданын реттеңіз.</li>
-            <li>Құмға бату тереңдігін бақылаңыз.</li>
+        <div style="background: rgba(255,255,255,0.7); padding: 1.5rem; border-radius: 20px; border: 1px solid #ffedd5;">
+          <h4 style="font-weight: 800; color: #9a3412; margin-bottom: 1rem;">Жұмыс барысы:</h4>
+          <ol style="font-size: 1rem; line-height: 1.6; color: #7c2d12; padding-left: 1.2rem; font-weight: 600;">
+            <li>Күш ($F$) пен ауданды ($S$) таңдаңыз.</li>
+            <li>Қысымды ($P = F/S$) есептеп, мәнін енгізіңіз.</li>
+            <li>"ТЕКСЕРУ" басып, нәтижені көріңіз.</li>
           </ol>
         </div>
       </div>
 
-      <div id="pressure-sim-stage" style="height: 300px; background: #fef3c7; border-radius: 24px; border: 2px solid #fde68a; margin-bottom: 2rem; position: relative; overflow: hidden;">
-         <!-- SVG sand -->
-      </div>
-
-      <div class="glass-panel" style="padding: 2rem; background: #fff7ed; border-radius: 24px;">
-        <div class="grid gap-8" style="grid-template-columns: 1fr 1fr;">
-          <div class="flex flex-col gap-2">
-            <span class="label-caps" style="font-weight: 800; color: #9a3412;">Күш (F):</span>
-            <input type="range" min="10" max="100" value="50" oninput="updatePressureValue('force', this.value)" style="width: 100%;">
-            <span id="pres-f-val" style="font-weight: 800; color: #f97316;">50 Н</span>
-          </div>
-          <div class="flex flex-col gap-3">
-            <span class="label-caps" style="font-weight: 800; color: #9a3412;">Тіреу ауданы (S):</span>
-            <div class="flex gap-2">
-               <button class="lab-btn ${pressureLabState.area === 0.5 ? 'active' : ''}" onclick="updatePressureValue('area', 0.5)">Кіші (2 см²)</button>
-               <button class="lab-btn ${pressureLabState.area === 1 ? 'active' : ''}" onclick="updatePressureValue('area', 1)">Орташа (4 см²)</button>
-               <button class="lab-btn ${pressureLabState.area === 2 ? 'active' : ''}" onclick="updatePressureValue('area', 2)">Үлкен (8 см²)</button>
-            </div>
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2.5rem;">
+        <div class="flex flex-col gap-6">
+          <div id="pressure-sim-stage" style="height: 380px; background: #fef3c7; border-radius: 32px; border: 2px solid #fde68a; position: relative; overflow: hidden; display: flex; align-items: flex-end; justify-content: center;"></div>
+          <div class="glass-panel" style="padding: 1.5rem; border-radius: 24px;">
+             <div class="grid grid-cols-2 gap-8">
+               <div class="flex flex-col gap-2">
+                 <span class="label-caps" style="font-weight: 800; color: #9a3412;">Күш (F):</span>
+                 <input type="range" id="pres-force-range" min="10" max="100" step="10" value="50" oninput="updatePressureValue()" style="width: 100%;">
+                 <span id="pres-f-v" style="font-weight: 800; color: #9a3412;">50 Н</span>
+               </div>
+               <div class="flex flex-col gap-2">
+                 <span class="label-caps" style="font-weight: 800; color: #9a3412;">Аудан (S):</span>
+                 <select id="pres-area-select" onchange="updatePressureValue()" style="padding: 0.6rem; border-radius: 10px; border: 1px solid #ffedd5; font-weight: 700;">
+                    <option value="1">Кіші (1 см²)</option>
+                    <option value="2" selected>Орташа (2 см²)</option>
+                    <option value="5">Үлкен (5 см²)</option>
+                 </select>
+               </div>
+             </div>
           </div>
         </div>
-        <div id="pres-data" style="margin-top: 1.5rem; text-align: center; color: #9a3412; font-size: 1.4rem; font-weight: 900;">
-           Паскаль: 50.0 Кра (Н/см²)
+
+        <div class="flex flex-col gap-4">
+          <div class="glass-card" style="padding: 2rem; background: white; border-top: 10px solid #f97316; border-radius: 28px;">
+            <h4 style="font-weight: 900; color: #9a3412; margin-bottom: 2rem;">ҚЫСЫМДЫ ЕСЕПТЕУ</h4>
+            <div class="flex flex-col gap-4">
+               <div style="padding: 1.2rem; background: #fff7ed; border-radius: 20px; border: 2px solid #ffedd5; text-align: center;">
+                 <p style="font-weight: 800; color: #9a3412; margin-bottom: 0.5rem;" class="label-caps">Қысым (Н/см²):</p>
+                 <div class="flex items-center justify-center gap-2">
+                    <input type="number" id="pres-calc-p" placeholder="???" style="width: 100px; padding: 0.8rem; border-radius: 12px; border: 2px solid #fed7aa; font-size: 1.2rem; font-weight: 900; text-align: center; color: #9a3412;">
+                    <span style="font-size: 1.2rem; font-weight: 900; color: #f97316;">Н/см²</span>
+                 </div>
+                 <button class="btn-primary" style="width: 100%; margin-top: 1rem; background: #f97316;" onclick="checkPressureCalculation()">ТЕКСЕРУ</button>
+               </div>
+               <div id="pres-feedback"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   `;
 }
 
-function updatePressureValue(prop, val) {
-  pressureLabState[prop] = parseFloat(val);
-  if (prop === 'force') document.getElementById('pres-f-val').innerText = `${val} Н`;
+function updatePressureValue() {
+  pressureLabState.force = parseFloat(document.getElementById('pres-force-range').value);
+  pressureLabState.area = parseFloat(document.getElementById('pres-area-select').value);
 
-  const p = pressureLabState.force / pressureLabState.area;
-  const pData = document.getElementById('pres-data');
-  if (pData) pData.innerText = `Қысым (P) = F / S = ${p.toFixed(1)} Н/см²`;
-
+  document.getElementById('pres-f-v').innerText = pressureLabState.force + " Н";
   updatePressureSim();
 }
 
 function updatePressureSim() {
   const stage = document.getElementById('pressure-sim-stage');
   if (!stage) return;
-
   const p = pressureLabState.force / pressureLabState.area;
-  const depth = (p / 20) * 30; // Scale pressure to sinking depth
+  const depth = (p / 20) * 30;
   const w = 40 * pressureLabState.area;
   const h = 80 / pressureLabState.area;
 
   stage.innerHTML = `
-    <svg width="100%" height="100%" viewBox="0 0 800 300">
-      <!-- Sand -->
-      <rect x="0" y="200" width="800" height="100" fill="#fde68a" />
-      <path d="M 0 200 Q 400 ${200 + depth / 2} 800 200" fill="#fde68a" stroke="#f59e0b" stroke-width="2" />
-      
-      <!-- Sinking Block -->
-      <rect x="${400 - w / 2}" y="${200 + depth - h}" width="${w}" height="${h}" fill="#92400e" rx="2" />
-      <text x="400" y="${200 + depth - h - 10}" text-anchor="middle" font-size="12" font-weight="900" fill="#78350f">Блок</text>
+    <svg width="100%" height="100%" viewBox="0 0 800 350">
+      <rect x="0" y="250" width="800" height="100" fill="#fde68a" />
+      <path d="M 0 250 Q 400 ${250 + depth / 2} 800 250" fill="#fde68a" stroke="#f59e0b" stroke-width="2" />
+      <rect x="${400 - w / 2}" y="${250 + depth - h}" width="${w}" height="${h}" fill="#92400e" rx="2" />
     </svg>
   `;
+}
+
+function checkPressureCalculation() {
+  const input = document.getElementById('pres-calc-p');
+  const feed = document.getElementById('pres-feedback');
+  if (!input || !feed) return;
+
+  const correct = (pressureLabState.force / pressureLabState.area).toFixed(1);
+  const user = parseFloat(input.value).toFixed(1);
+
+  if (Math.abs(correct - user) < 0.1) {
+    pressureLabState.isSolved = true;
+    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Қысым дәл есептелді.</div>';
+    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+    if (window.triggerSalute) triggerSalute();
+  } else {
+    feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. P = F / S формуласын қолдан.</div>';
+  }
 }
 
 // Archimedes Lab State
 let archiLabState = {
   liquid: 'water',
-  vol: 100, // cm3
-  isSubmerged: false
-};
-
-const liquidData = {
-  water: { d: 1000, name: 'Су', color: '#bae6fd' },
-  oil: { d: 800, name: 'Май', color: '#fef08a' },
-  mercury: { d: 13600, name: 'Сынап', color: '#94a3b8' }
+  vol: 100,
+  isSubmerged: false,
+  isSolved: false,
+  feedback: ''
 };
 
 function renderArchimedesLab() {
@@ -1698,48 +2120,64 @@ function renderArchimedesLab() {
   }, 100);
 
   return `
-    <div class="glass-panel animate-scale-in" style="padding: 2rem; margin-top: 1rem; border-radius: 32px; border: 1px solid var(--border-glass); background: white;">
-      <div class="grid gap-6" style="grid-template-columns: 1fr 1fr; margin-bottom: 2rem; background: #f0fdfa; padding: 2rem; border-radius: 24px; border: 1.5px solid #ccfbf1;">
+    <div class="animate-scale-in" style="padding: 1rem;">
+      <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #f0fdfa; padding: 2rem; border-radius: 28px; border: 1.5px solid #ccfbf1;">
         <div>
-          <h3 style="color: #0d9488; font-size: 1.5rem; margin-bottom: 1rem; font-weight: 800;">№10: Архимед заңы</h3>
-          <p style="font-size: 1.1rem; margin-bottom: 0.5rem;"><strong style="color: #0f766e;">Мақсаты:</strong> Кері итеруші күштің сұйық тығыздығы мен дене көлеміне тәуелділігін зерделеу.</p>
-          <div style="background: white; padding: 1rem; border-radius: 12px; border: 1.5px solid #99f6e4; margin-top: 1rem;">
-             <code style="font-size: 1.8rem; font-weight: 900; color: #0d9488;">F_А = ρ · g · V</code>
+          <h3 style="color: #0d9488; font-size: 1.6rem; margin-bottom: 1rem; font-weight: 900;">№10: Архимед заңы</h3>
+          <p style="font-size: 1.1rem; margin-bottom: 0.8rem;"><strong style="color: #0f766e;"><i data-lucide="target" size="18" style="vertical-align: middle; margin-right: 8px;"></i> Жұмыс мақсаты:</strong> Кері итеруші күштің ($F_A$) сұйық тығыздығы мен көлемге тәуелділігін зерттеу.</p>
+          <div style="background: white; padding: 1.2rem; border-radius: 16px; border: 1.5px solid #ccfbf1; margin-top: 1rem;">
+             <p style="font-weight: 800; color: #0d9488; margin-bottom: 8px;" class="label-caps">Формула (g ≈ 10):</p>
+             <div style="font-size: 1.8rem; font-weight: 900; color: #0d9488; font-family: 'Outfit', sans-serif;">F_A = ρ · g · V</div>
           </div>
         </div>
-        <div style="background: rgba(255,255,255,0.6); padding: 1.5rem; border-radius: 16px; border: 1px solid #ccfbf1;">
-          <h4 style="font-weight: 800; color: #0d9488; margin-bottom: 0.8rem;">Жұмыс барысы:</h4>
-          <ol style="font-size: 0.95rem; line-height: 1.6; color: #0f766e; padding-left: 1.2rem;">
-            <li>Сұйықтың түрін таңдаңыз.</li>
-            <li>Дененің батқан көлемін реттеңіз.</li>
-            <li>Динамометр арқылы Архимед күшін өлшеңіз.</li>
+        <div style="background: rgba(255,255,255,0.7); padding: 1.5rem; border-radius: 20px; border: 1px solid #ccfbf1;">
+          <h4 style="font-weight: 800; color: #0d9488; margin-bottom: 1rem;">Жұмыс барысы:</h4>
+          <ol style="font-size: 1rem; line-height: 1.6; color: #0f766e; padding-left: 1.2rem; font-weight: 600;">
+            <li>Сұйықты таңдап, көлемді ($V$) реттеңіз (м³-ге аударуды ұмытпаңыз).</li>
+            <li>Архимед күшін ($F_A$) есептеп, мәнін енгізіңіз.</li>
+            <li>"ТЕКСЕРУ" басып, нәтижені көріңіз.</li>
           </ol>
         </div>
       </div>
 
-      <div id="archi-sim-stage" style="height: 350px; background: #f8fafc; border-radius: 24px; border: 2px solid #e2e8f0; margin-bottom: 2rem; position: relative;">
-         <!-- SVG -->
-      </div>
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2.5rem;">
+        <div class="flex flex-col gap-6">
+          <div id="archi-sim-stage" style="height: 380px; background: white; border-radius: 32px; border: 1px solid var(--border-glass); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;"></div>
+          <div class="glass-panel" style="padding: 1.5rem; border-radius: 24px;">
+             <div class="grid grid-cols-2 gap-8">
+               <div class="flex flex-col gap-2">
+                 <span class="label-caps" style="font-weight: 800; color: #0d9488;">Сұйық (ρ):</span>
+                 <select id="archi-liq-select" onchange="updateArchiValue()" style="padding: 0.6rem; border-radius: 10px; border: 1px solid #99f6e4; font-weight: 700;">
+                    <option value="water">Су (1000 кг/м³)</option>
+                    <option value="oil">Май (800 кг/м³)</option>
+                 </select>
+               </div>
+               <div class="flex flex-col gap-2">
+                 <span class="label-caps" style="font-weight: 800; color: #0d9488;">Көлем (V):</span>
+                 <input type="range" id="archi-vol-range" min="100" max="500" step="100" value="200" oninput="updateArchiValue()" style="width: 100%;">
+                 <span id="archi-vol-v" style="font-weight: 800; color: #0d9488;">200 см³ (0.0002 м³)</span>
+               </div>
+             </div>
+             <div class="flex justify-center mt-4">
+                <button id="archi-sub-btn" class="btn-primary" style="background: #0d9488; width: 200px;" onclick="toggleArchiSubmerge()">БАТЫРУ</button>
+             </div>
+          </div>
+        </div>
 
-      <div class="glass-panel" style="padding: 2rem; background: #f0fdfa; border-radius: 24px;">
-        <div class="grid gap-8" style="grid-template-columns: 1fr 1fr 120px;">
-          <div class="flex flex-col gap-3">
-            <span class="label-caps" style="font-weight: 800; color: #0d9488;">Сұйық:</span>
-            <select onchange="updateArchiValue('liquid', this.value)" style="padding: 0.8rem; border-radius: 12px; border: 2px solid #99f6e4; font-weight: 700;">
-              <option value="water">Су</option>
-              <option value="oil">Май</option>
-              <option value="mercury">Сынап</option>
-            </select>
-          </div>
-          <div class="flex flex-col gap-2">
-            <span class="label-caps" style="font-weight: 800; color: #0d9488;">Батқан көлем ($V_б$):</span>
-            <input type="range" min="0" max="200" value="100" oninput="updateArchiValue('vol', this.value)" style="width: 100%;">
-            <span id="archi-v-val" style="font-weight: 800; color: #0d9488;">100 см³</span>
-          </div>
-          <div class="flex flex-col items-center justify-center">
-             <button class="btn-primary" onclick="toggleArchiSubmerge()" style="padding: 0.8rem; border-radius: 12px; background: #0d9488;">
-                БАТЫРУ
-             </button>
+        <div class="flex flex-col gap-4">
+          <div class="glass-card" style="padding: 2rem; background: white; border-top: 10px solid #0d9488; border-radius: 28px;">
+            <h4 style="font-weight: 900; color: #0f766e; margin-bottom: 2rem;">КҮШТІ ЕСЕПТЕУ</h4>
+            <div class="flex flex-col gap-4">
+               <div style="padding: 1.2rem; background: #f0fdfa; border-radius: 20px; border: 2px solid #ccfbf1; text-align: center;">
+                 <p style="font-weight: 800; color: #0d9488; margin-bottom: 0.5rem;" class="label-caps">Кері итеруші күш (Н):</p>
+                 <div class="flex items-center justify-center gap-2">
+                    <input type="number" id="archi-calc-fa" placeholder="???" style="width: 100px; padding: 0.8rem; border-radius: 12px; border: 2px solid #99f6e4; font-size: 1.2rem; font-weight: 900; text-align: center; color: #0d9488;">
+                    <span style="font-size: 1.2rem; font-weight: 900; color: #0d9488;">Н</span>
+                 </div>
+                 <button class="btn-primary" style="width: 100%; margin-top: 1rem; background: #0d9488;" onclick="checkArchimedesCalculation()">ТЕКСЕРУ</button>
+               </div>
+               <div id="archi-feedback"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -1747,13 +2185,19 @@ function renderArchimedesLab() {
   `;
 }
 
-function updateArchiValue(prop, val) {
-  if (prop === 'liquid') archiLabState.liquid = val;
-  if (prop === 'vol') archiLabState.vol = parseFloat(val);
+function updateArchiValue() {
+  archiLabState.liquid = document.getElementById('archi-liq-select').value;
+  archiLabState.vol = parseFloat(document.getElementById('archi-vol-range').value);
 
-  const vLabel = document.getElementById('archi-v-val');
-  if (vLabel) vLabel.innerText = `${archiLabState.vol} см³`;
+  const m3 = (archiLabState.vol / 1000000).toFixed(4);
+  document.getElementById('archi-vol-v').innerText = `${archiLabState.vol} см³ (${m3} м³)`;
+  updateArchiSim();
+}
 
+function toggleArchiSubmerge() {
+  archiLabState.isSubmerged = !archiLabState.isSubmerged;
+  const btn = document.getElementById('archi-sub-btn');
+  if (btn) btn.innerText = archiLabState.isSubmerged ? 'ШЫҒАРУ' : 'БАТЫРУ';
   updateArchiSim();
 }
 
@@ -1761,100 +2205,197 @@ function updateArchiSim() {
   const stage = document.getElementById('archi-sim-stage');
   if (!stage) return;
 
-  const liq = liquidData[archiLabState.liquid];
-  const g = 10;
-  // Fa = rho * g * V (convert cm3 to m3: V/1000000)
-  const Fa = (liq.d * g * archiLabState.vol) / 1000000;
-
-  const weightInAir = 5; // 5 Newtons
-  const weightInLiquid = archiLabState.isSubmerged ? (weightInAir - Fa) : weightInAir;
+  const liqColor = archiLabState.liquid === 'water' ? '#bae6fd' : '#fef08a';
+  const y = archiLabState.isSubmerged ? 180 : 100;
+  const size = 60 + (archiLabState.vol / 10);
 
   stage.innerHTML = `
     <svg width="100%" height="100%" viewBox="0 0 800 350">
-      <!-- Tank -->
-      <rect x="300" y="150" width="200" height="150" fill="${liq.color}" opacity="0.6" stroke="${liq.color}" stroke-dasharray="0" stroke-width="2" />
-      <text x="400" y="320" text-anchor="middle" font-weight="800" fill="#134e4a">${liq.name}</text>
-
-      <!-- Spring Scale -->
+      <rect x="300" y="150" width="200" height="200" fill="${liqColor}" opacity="0.6" stroke="${liqColor}" stroke-width="2" />
       <g transform="translate(400, 50)">
-         <rect x="-15" y="0" width="30" height="80" fill="#cbd5e1" rx="4" />
-         <line x1="0" y1="80" x2="0" y2="${80 + weightInLiquid * 20}" stroke="#475569" stroke-width="2" />
-         <rect x="-20" y="${80 + weightInLiquid * 20}" width="40" height="40" rx="4" fill="#134e4a" />
-         <text x="0" y="-10" text-anchor="middle" font-weight="900" fill="#0d9488">F = ${weightInLiquid.toFixed(2)} Н</text>
-         ${archiLabState.isSubmerged ? `<text x="50" y="100" font-weight="800" fill="#0d9488">F_А = ${Fa.toFixed(2)} Н</text>` : ''}
+         <rect x="-10" y="0" width="20" height="100" fill="#cbd5e1" />
+         <line x1="0" y1="100" x2="0" y2="${y}" stroke="#475569" stroke-width="2" />
+         <rect x="-${size / 2}" y="${y}" width="${size}" height="${size}" fill="#134e4a" rx="4" />
       </g>
     </svg>
   `;
 }
 
-function toggleArchiSubmerge() {
-  archiLabState.isSubmerged = !archiLabState.isSubmerged;
-  updateArchiSim();
+function checkArchimedesCalculation() {
+  const input = document.getElementById('archi-calc-fa');
+  const feed = document.getElementById('archi-feedback');
+  if (!input || !feed) return;
+
+  const rho = archiLabState.liquid === 'water' ? 1000 : 800;
+  const correct = (rho * 10 * archiLabState.vol) / 1000000;
+  const user = parseFloat(input.value);
+
+  if (Math.abs(correct - user) < 0.05) {
+    archiLabState.isSolved = true;
+    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Архимед күші табылды.</div>';
+    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+    if (window.triggerSalute) triggerSalute();
+  } else {
+    feed.innerHTML = `<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. ρ·g·V есепте. Жауап: ${correct.toFixed(2)}</div>`;
+  }
 }
 
+// Newton 1 Lab State
+let newton1LabState = {
+  v0: 10,
+  surface: 'floor',
+  mu: 0.1,
+  isSolved: false,
+  feedback: '',
+  isMoving: false
+};
 
-function updateNewton1Value(prop, val) {
-  if (prop === 'v0') {
-    newton1LabState.v0 = parseFloat(val);
-    document.getElementById('n1-v0-val').innerText = `${val} м/с`;
-  } else if (prop === 'surface') {
-    newton1LabState.surface = val;
-    newton1LabState.friction = val === 'ice' ? 0.05 : val === 'grass' ? 0.3 : 0.6;
-  }
+function renderNewton1Lab() {
+  setTimeout(() => {
+    updateNewton1Sim();
+    if (window.lucide) lucide.createIcons();
+  }, 100);
+
+  return `
+    <div class="animate-scale-in" style="padding: 1rem;">
+      <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #f8fafc; padding: 2rem; border-radius: 28px; border: 1.5px solid #e2e8f0;">
+        <div>
+          <h3 style="color: #475569; font-size: 1.6rem; margin-bottom: 1rem; font-weight: 900;">№4: Инерция заңы</h3>
+          <p style="font-size: 1.1rem; margin-bottom: 0.8rem;"><strong style="color: #1e293b;"><i data-lucide="target" size="18" style="vertical-align: middle; margin-right: 8px;"></i> Жұмыс мақсаты:</strong> Үйкеліс күшінің тоқтау қашықтығына әсерін зерттеу.</p>
+          <div style="background: white; padding: 1.2rem; border-radius: 16px; border: 1.5px solid #e2e8f0; margin-top: 1rem;">
+             <p style="font-weight: 800; color: #475569; margin-bottom: 8px;" class="label-caps">Формула:</p>
+             <div style="font-size: 1.8rem; font-weight: 900; color: #1e293b;">d = v₀² / (2 · μ · g)</div>
+          </div>
+        </div>
+        <div style="background: rgba(255,255,255,0.7); padding: 1.5rem; border-radius: 20px; border: 1px solid #e2e8f0;">
+          <h4 style="font-weight: 800; color: #475569; margin-bottom: 1rem;">Жұмыс барысы:</h4>
+          <ol style="font-size: 1rem; line-height: 1.6; color: #1e293b; padding-left: 1.2rem; font-weight: 600;">
+            <li>Бастапқы жылдамдық пен бетті таңдаңыз.</li>
+            <li>Тоқтау қашықтығын ($d$) есептеп, мәнін енгізіңіз ($g \approx 10$ м/с²).</li>
+            <li>"БАСТАУ" басып, нәтижені тексеріңіз.</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2.5rem;">
+        <div class="flex flex-col gap-6">
+          <div id="newton1-sim-stage" style="height: 380px; background: white; border-radius: 32px; border: 1px solid var(--border-glass); position: relative; overflow: hidden; display: flex; align-items: flex-end;"></div>
+          <div class="glass-panel" style="padding: 1.5rem; border-radius: 24px;">
+             <div class="grid grid-cols-2 gap-8">
+               <div class="flex flex-col gap-2">
+                 <span class="label-caps" style="font-weight: 800; color: #64748b;">$v_0$ (м/с):</span>
+                 <input type="range" id="n1-v0-range" min="5" max="20" step="5" value="10" oninput="updateNewton1Value()" style="width: 100%;">
+                 <span id="n1-v0-val" style="font-weight: 800; color: #475569;">10 м/с</span>
+               </div>
+               <div class="flex flex-col gap-2">
+                 <span class="label-caps" style="font-weight: 800; color: #64748b;">Бет түрі:</span>
+                 <select id="n1-surface" onchange="updateNewton1Value()" style="padding: 0.6rem; border-radius: 10px; border: 1px solid #cbd5e1; font-weight: 700;">
+                    <option value="0.1">Мұз (μ = 0.1)</option>
+                    <option value="0.5" selected>Еден (μ = 0.5)</option>
+                    <option value="1.0">Құм (μ = 1.0)</option>
+                 </select>
+               </div>
+             </div>
+             <button id="n1-start-btn" class="btn-primary" style="width: 100%; margin-top: 1.5rem; padding: 1rem; border-radius: 12px;" onclick="startNewton1Anim()">БАСТАУ</button>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-4">
+          <div class="glass-card" style="padding: 2rem; background: white; border-top: 10px solid #64748b; border-radius: 28px;">
+            <h4 style="font-weight: 900; color: #1e293b; margin-bottom: 2rem;">ҚАШЫҚТЫҚТЫ ЕСЕПТЕУ</h4>
+            <div class="flex flex-col gap-4">
+               <div style="padding: 1.2rem; background: #f8fafc; border-radius: 20px; border: 2px solid #e2e8f0; text-align: center;">
+                 <p style="font-weight: 800; color: #475569; margin-bottom: 0.5rem;" class="label-caps">Тоқтау қашықтығы (м):</p>
+                 <div class="flex items-center justify-center gap-2">
+                    <input type="number" id="n1-calc-d" placeholder="???" style="width: 100px; padding: 0.8rem; border-radius: 12px; border: 2px solid #cbd5e1; font-size: 1.2rem; font-weight: 900; text-align: center; color: #1e293b;">
+                    <span style="font-size: 1.2rem; font-weight: 900; color: #64748b;">м</span>
+                 </div>
+                 <button class="btn-primary" style="width: 100%; margin-top: 1rem; background: #475569;" onclick="checkNewton1Calculation()">ТЕКСЕРУ</button>
+               </div>
+               <div id="n1-feedback"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function updateNewton1Value() {
+  const v0 = parseFloat(document.getElementById('n1-v0-range').value);
+  const mu = parseFloat(document.getElementById('n1-surface').value);
+  newton1LabState.v0 = v0;
+  newton1LabState.mu = mu;
+
+  document.getElementById('n1-v0-val').innerText = v0 + " м/с";
   updateNewton1Sim();
 }
 
 function updateNewton1Sim() {
   const stage = document.getElementById('newton1-sim-stage');
   if (!stage) return;
-
-  let surfaceColor = newton1LabState.surface === 'ice' ? '#e0f2fe' : newton1LabState.surface === 'grass' ? '#dcfce7' : '#f1f5f9';
+  const mu = newton1LabState.mu;
+  const color = mu < 0.2 ? '#e0f2fe' : mu > 0.6 ? '#fef3c7' : '#f1f5f9';
 
   stage.innerHTML = `
-    <svg width="100%" height="100%" viewBox="0 0 800 300">
-      <rect x="0" y="220" width="800" height="80" fill="${surfaceColor}" />
-      <line x1="0" y1="220" x2="800" y2="220" stroke="#94a3b8" stroke-width="2" />
-      
-      <!-- Ground markings -->
+    <svg width="100%" height="100%" viewBox="0 0 800 350">
+      <rect x="0" y="300" width="800" height="50" fill="${color}" />
+      <line x1="0" y1="300" x2="800" y2="300" stroke="#94a3b8" stroke-width="2" />
       ${[0, 100, 200, 300, 400, 500, 600, 700, 800].map(x => `
-        <line x1="${x}" y1="220" x2="${x}" y2="235" stroke="#94a3b8" stroke-width="1" />
-        <text x="${x + 5}" y="245" font-size="10" fill="#94a3b8">${x / 10} м</text>
+        <line x1="${x}" y1="300" x2="${x}" y2="315" stroke="#94a3b8" stroke-width="1" />
+        <text x="${x + 5}" y="330" font-size="10" fill="#94a3b8">${x / 10} м</text>
       `).join('')}
-
-      <g id="n1-car" transform="translate(50, 180)">
-         <rect x="0" y="0" width="60" height="30" rx="5" fill="#9a3412" />
-         <circle cx="15" cy="40" r="8" fill="#1e293b" />
-         <circle cx="45" cy="40" r="8" fill="#1e293b" />
+      <g id="n1-car" transform="translate(50, 260)">
+         <rect x="0" y="0" width="60" height="30" rx="5" fill="#475569" />
+         <circle cx="15" cy="35" r="8" fill="#1e293b" />
+         <circle cx="45" cy="35" r="8" fill="#1e293b" />
       </g>
     </svg>
   `;
 }
 
-function startNewton1Anim() {
-  if (newton1LabState.isMoving) return;
-  newton1LabState.isMoving = true;
-  document.getElementById('n1-start-btn').disabled = true;
+function checkNewton1Calculation() {
+  const input = document.getElementById('n1-calc-d');
+  const feed = document.getElementById('n1-feedback');
+  if (!input || !feed) return;
 
+  const correct = (Math.pow(newton1LabState.v0, 2) / (2 * newton1LabState.mu * 10)).toFixed(1);
+  const user = parseFloat(input.value).toFixed(1);
+
+  if (Math.abs(correct - user) < 0.2) {
+    newton1LabState.isSolved = true;
+    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Инерция заңы дәлелденді.</div>';
+    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+    if (window.triggerSalute) triggerSalute();
+  } else {
+    feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. d = v² / (2μg) формуласын қолдан.</div>';
+  }
+}
+
+function startNewton1Anim() {
   const car = document.getElementById('n1-car');
+  const btn = document.getElementById('n1-start-btn');
+  if (!car || !btn || btn.disabled) return;
+
+  btn.disabled = true;
   let x = 50;
   let v = newton1LabState.v0;
-  const a = -9.8 * newton1LabState.friction; // deceleration
+  const a = -10 * newton1LabState.mu;
 
   function step() {
-    v += a * 0.016; // 60fps
+    v += a * 0.016;
     if (v <= 0) {
-      newton1LabState.isMoving = false;
-      document.getElementById('n1-start-btn').disabled = false;
-      if (window.triggerSalute && v < 0.1) triggerSalute();
+      btn.disabled = false;
+      setTimeout(() => car.setAttribute('transform', 'translate(50, 260)'), 2000);
       return;
     }
     x += v;
     if (x > 740) {
-      newton1LabState.isMoving = false;
-      document.getElementById('n1-start-btn').disabled = false;
+      btn.disabled = false;
+      setTimeout(() => car.setAttribute('transform', 'translate(50, 260)'), 2000);
       return;
     }
-    car.setAttribute('transform', `translate(${x}, 180)`);
+    car.setAttribute('transform', `translate(${x}, 260)`);
     requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
@@ -1864,6 +2405,8 @@ function startNewton1Anim() {
 let newton2LabState = {
   force: 10,
   mass: 2,
+  isSolved: false,
+  feedback: '',
   isMoving: false
 };
 
@@ -1874,60 +2417,73 @@ function renderNewton2Lab() {
   }, 100);
 
   return `
-    <div class="glass-panel animate-scale-in" style="padding: 2rem; margin-top: 1rem; border-radius: 32px; border: 1px solid var(--border-glass); background: white;">
-      <div class="grid gap-6" style="grid-template-columns: 1fr 1fr; margin-bottom: 2rem; background: #ecfdf5; padding: 2rem; border-radius: 24px; border: 1.5px solid #d1fae5;">
+    <div class="animate-scale-in" style="padding: 1rem;">
+      <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #ecfdf5; padding: 2rem; border-radius: 28px; border: 1.5px solid #d1fae5;">
         <div>
-          <h3 style="color: #065f46; font-size: 1.5rem; margin-bottom: 1rem; font-weight: 800;">№5: Ньютонның 2-заңы</h3>
-          <p style="font-size: 1.1rem; margin-bottom: 0.5rem;"><strong style="color: #064e3b;">Мақсаты:</strong> Күш, масса және үдеу арасындағы байланысты зерттеу (F = ma).</p>
-          <div style="background: white; padding: 1rem; border-radius: 12px; border: 1.5px solid #a7f3d0; margin-top: 1rem;">
-             <code style="font-size: 1.5rem; font-weight: 900; color: #059669;">a = F / m</code>
+          <h3 style="color: #065f46; font-size: 1.6rem; margin-bottom: 1rem; font-weight: 900;">№5: Ньютонның 2-заңы</h3>
+          <p style="font-size: 1.1rem; margin-bottom: 0.8rem;"><strong style="color: #064e3b;"><i data-lucide="target" size="18" style="vertical-align: middle; margin-right: 8px;"></i> Жұмыс мақсаты:</strong> Күш пен массаның үдеуге әсерін зерттеу.</p>
+          <div style="background: white; padding: 1.2rem; border-radius: 16px; border: 1.5px solid #a7f3d0; margin-top: 1rem;">
+             <p style="font-weight: 800; color: #065f46; margin-bottom: 8px;" class="label-caps">Формула:</p>
+             <div style="font-size: 1.8rem; font-weight: 900; color: #064e3b; font-family: 'Outfit', sans-serif;">a = F / m</div>
           </div>
         </div>
-        <div style="background: rgba(255,255,255,0.6); padding: 1.5rem; border-radius: 16px; border: 1px solid #d1fae5;">
-          <h4 style="font-weight: 800; color: #065f46; margin-bottom: 0.8rem;">Жұмыс барысы:</h4>
-          <ol style="font-size: 0.95rem; line-height: 1.6; color: #064e3b; padding-left: 1.2rem;">
-            <li>Дененің массасын және түсірілген күшті таңдаңыз.</li>
-            <li>"БАСТАУ" басып, қозғалыс үдеуін бақылаңыз.</li>
-            <li>Үдеудің қалай өзгеретінін есептеп, заңдылықты табыңыз.</li>
+        <div style="background: rgba(255,255,255,0.7); padding: 1.5rem; border-radius: 20px; border: 1px solid #d1fae5;">
+          <h4 style="font-weight: 800; color: #065f46; margin-bottom: 1rem;">Жұмыс барысы:</h4>
+          <ol style="font-size: 1rem; line-height: 1.6; color: #064e3b; padding-left: 1.2rem; font-weight: 600;">
+            <li>Күш ($F$) пен массаны ($m$) таңдаңыз.</li>
+            <li>Үдеуді ($a = F/m$) есептеп, мәнін енгізіңіз.</li>
+            <li>"БАСТАУ" басып, нәтижені тексеріңіз.</li>
           </ol>
         </div>
       </div>
 
-      <div id="newton2-sim-stage" style="height: 300px; background: #f8fafc; border-radius: 24px; border: 2px solid #e2e8f0; margin-bottom: 2rem; position: relative; overflow: hidden;">
-         <!-- SVG -->
-      </div>
-
-      <div class="glass-panel" style="padding: 2rem; background: #ecfdf5; border-radius: 24px;">
-        <div class="grid gap-8" style="grid-template-columns: 1fr 1fr 1fr;">
-          <div class="flex flex-col gap-2">
-            <span class="label-caps" style="font-weight: 800; color: #065f46;">Күш (F):</span>
-            <input type="range" min="1" max="50" value="10" oninput="updateNewton2Value('force', this.value)" style="width: 100%;">
-            <span id="n2-force-val" style="font-weight: 800; color: #059669;">10 Н</span>
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2.5rem;">
+        <div class="flex flex-col gap-6">
+          <div id="newton2-sim-stage" style="height: 380px; background: white; border-radius: 32px; border: 1px solid var(--border-glass); position: relative; overflow: hidden; display: flex; align-items: flex-end;"></div>
+          <div class="glass-panel" style="padding: 1.5rem; border-radius: 24px;">
+             <div class="grid grid-cols-2 gap-8">
+               <div class="flex flex-col gap-2">
+                 <span class="label-caps" style="font-weight: 800; color: #059669;">Күш (F):</span>
+                 <input type="range" id="n2-force-range" min="10" max="100" step="10" value="10" oninput="updateNewton2Value()" style="width: 100%;">
+                 <span id="n2-force-val" style="font-weight: 800; color: #065f46;">10 Н</span>
+               </div>
+               <div class="flex flex-col gap-2">
+                 <span class="label-caps" style="font-weight: 800; color: #059669;">Масса (m):</span>
+                 <input type="range" id="n2-mass-range" min="1" max="5" step="1" value="2" oninput="updateNewton2Value()" style="width: 100%;">
+                 <span id="n2-mass-val" style="font-weight: 800; color: #065f46;">2 кг</span>
+               </div>
+             </div>
+             <button id="n2-start-btn" class="btn-primary" style="width: 100%; margin-top: 1.5rem; padding: 1rem; border-radius: 12px; background: #059669;" onclick="startNewton2Anim()">БАСТАУ</button>
           </div>
-          <div class="flex flex-col gap-2">
-            <span class="label-caps" style="font-weight: 800; color: #065f46;">Масса (m):</span>
-            <input type="range" min="1" max="10" value="2" oninput="updateNewton2Value('mass', this.value)" style="width: 100%;">
-            <span id="n2-mass-val" style="font-weight: 800; color: #059669;">2 кг</span>
-          </div>
-          <button class="btn-primary" onclick="startNewton2Anim()" id="n2-start-btn" style="background: #059669; border-radius: 12px; padding: 1rem;">
-             БАСТАУ
-          </button>
         </div>
-        <div id="n2-data" style="margin-top: 1rem; text-align: center; font-weight: 800; color: #064e3b; font-size: 1.2rem;">
-           Үдеу (a): 5.00 м/с²
+
+        <div class="flex flex-col gap-4">
+          <div class="glass-card" style="padding: 2rem; background: white; border-top: 10px solid #059669; border-radius: 28px;">
+            <h4 style="font-weight: 900; color: #065f46; margin-bottom: 2rem;">ҮДЕУДІ ЕСЕПТЕУ</h4>
+            <div class="flex flex-col gap-4">
+               <div style="padding: 1.2rem; background: #ecfdf5; border-radius: 20px; border: 2px solid #d1fae5; text-align: center;">
+                 <p style="font-weight: 800; color: #065f46; margin-bottom: 0.5rem;" class="label-caps">Үдеу (a = F/m):</p>
+                 <div class="flex items-center justify-center gap-2">
+                    <input type="number" id="n2-calc-a" placeholder="???" style="width: 100px; padding: 0.8rem; border-radius: 12px; border: 2px solid #a7f3d0; font-size: 1.2rem; font-weight: 900; text-align: center; color: #065f46;">
+                    <span style="font-size: 1.2rem; font-weight: 900; color: #059669;">м/с²</span>
+                 </div>
+                 <button class="btn-primary" style="width: 100%; margin-top: 1rem; background: #059669;" onclick="checkNewton2Calculation()">ТЕКСЕРУ</button>
+               </div>
+               <div id="n2-feedback"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   `;
 }
 
-function updateNewton2Value(prop, val) {
-  newton2LabState[prop] = parseFloat(val);
-  if (prop === 'force') document.getElementById('n2-force-val').innerText = `${val} Н`;
-  if (prop === 'mass') document.getElementById('n2-mass-val').innerText = `${val} кг`;
+function updateNewton2Value() {
+  newton2LabState.force = parseFloat(document.getElementById('n2-force-range').value);
+  newton2LabState.mass = parseFloat(document.getElementById('n2-mass-range').value);
 
-  const a = newton2LabState.force / newton2LabState.mass;
-  document.getElementById('n2-data').innerText = `Үдеу (a) = F / m = ${a.toFixed(2)} м/с²`;
+  document.getElementById('n2-force-val').innerText = newton2LabState.force + " Н";
+  document.getElementById('n2-mass-val').innerText = newton2LabState.mass + " кг";
   updateNewton2Sim();
 }
 
@@ -1936,47 +2492,59 @@ function updateNewton2Sim() {
   if (!stage) return;
 
   stage.innerHTML = `
-    <svg width="100%" height="100%" viewBox="0 0 800 300">
-      <rect x="0" y="220" width="800" height="80" fill="#f8fafc" />
-      <line x1="0" y1="220" x2="800" y2="220" stroke="#94a3b8" stroke-width="2" />
-      
-      <g id="n2-block" transform="translate(100, 170)">
+    <svg width="100%" height="100%" viewBox="0 0 800 350">
+      <rect x="0" y="300" width="800" height="50" fill="#f1f5f9" />
+      <line x1="0" y1="300" x2="800" y2="300" stroke="#94a3b8" stroke-width="2" />
+      <g id="n2-block" transform="translate(100, 250)">
          <rect x="0" y="0" width="80" height="50" rx="4" fill="#059669" />
          <text x="40" y="30" text-anchor="middle" fill="white" font-weight="900">${newton2LabState.mass} кг</text>
-         
-         <!-- Force Arrow -->
-         <path d="M 85 25 L 125 25 M 125 25 L 115 15 M 125 25 L 115 35" stroke="#ef4444" stroke-width="3" />
-         <text x="130" y="20" fill="#ef4444" font-weight="900">${newton2LabState.force} Н</text>
+         <path d="M -10 25 L -50 25 M -10 25 L -20 15 M -10 25 L -20 35" stroke="#ef4444" stroke-width="3" />
+         <text x="-70" y="20" fill="#ef4444" font-weight="900" text-anchor="end">${newton2LabState.force} Н</text>
       </g>
     </svg>
   `;
 }
 
-function startNewton2Anim() {
-  if (newton2LabState.isMoving) return;
-  newton2LabState.isMoving = true;
-  document.getElementById('n2-start-btn').disabled = true;
+function checkNewton2Calculation() {
+  const input = document.getElementById('n2-calc-a');
+  const feed = document.getElementById('n2-feedback');
+  if (!input || !feed) return;
 
+  const correct = (newton2LabState.force / newton2LabState.mass).toFixed(1);
+  const user = parseFloat(input.value).toFixed(1);
+
+  if (Math.abs(correct - user) < 0.1) {
+    newton2LabState.isSolved = true;
+    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Үдеу дәл есептелді.</div>';
+    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+    if (window.triggerSalute) triggerSalute();
+  } else {
+    feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. a = F / m формуласын қолдан.</div>';
+  }
+}
+
+function startNewton2Anim() {
   const block = document.getElementById('n2-block');
+  const btn = document.getElementById('n2-start-btn');
+  if (!block || !btn || btn.disabled) return;
+
+  btn.disabled = true;
   let x = 100;
   let v = 0;
   const a = newton2LabState.force / newton2LabState.mass;
 
   function step() {
     v += a * 0.016;
-    x += v;
+    x += v * 0.5;
     if (x > 700) {
-      newton2LabState.isMoving = false;
-      document.getElementById('n2-start-btn').disabled = false;
-      if (window.triggerSalute) triggerSalute();
+      btn.disabled = false;
+      setTimeout(() => block.setAttribute('transform', 'translate(100, 250)'), 2000);
       return;
     }
-    block.setAttribute('transform', `translate(${x}, 170)`);
+    block.setAttribute('transform', `translate(${x}, 250)`);
     requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
-
-
 }
 
 const hookeLabState = {
@@ -1998,9 +2566,9 @@ function renderHookeLab() {
   return `
     <div class="animate-scale-in" style="padding: 1rem;">
       <!-- Lab Report Header -->
-      <div class="grid gap-6" style="grid-template-columns: 1fr 1fr; margin-bottom: 2rem; background: #f0fdf4; padding: 2rem; border-radius: 28px; border: 1.5px solid #dcfce7;">
+      <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #f0fdf4; padding: 2rem; border-radius: 28px; border: 1.5px solid #dcfce7;">
         <div>
-          <h3 style="color: #166534; font-size: 1.6rem; margin-bottom: 1rem; font-weight: 900;">Гук заңын зерттеу</h3>
+          <h3 style="color: #166534; font-size: 1.6rem; margin-bottom: 1rem; font-weight: 900;">№3 Гук заңын зерттеу</h3>
           <p style="font-size: 1.1rem; margin-bottom: 0.8rem;"><strong style="color: #14532d;"><i data-lucide="target" size="18" style="vertical-align: middle; margin-right: 8px;"></i> Жұмыс мақсаты:</strong> Тәжірибе арқылы серпімділік күшінің ұзаруға тәуелділігін зерделеу және қатаңдықты анықтау.</p>
           <div style="background: white; padding: 1.2rem; border-radius: 16px; border: 1.5px solid #bbf7d0; margin-top: 1rem;">
              <p style="font-weight: 800; color: #166534; margin-bottom: 8px;" class="label-caps">Формула:</p>
@@ -2020,7 +2588,7 @@ function renderHookeLab() {
         </div>
       </div>
 
-      <div class="grid" style="grid-template-columns: 1fr 340px; gap: 2.5rem;">
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2.5rem;">
         <!-- Simulation Area -->
         <div class="flex flex-col gap-6">
           <div id="hooke-sim-stage" style="height: 440px; background: white; border-radius: 32px; border: 1px solid var(--border-glass); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
@@ -2176,6 +2744,7 @@ function checkHookeCalculation(type) {
       hookeLabState.isSolvedX = true;
       hookeLabState.feedbackX = `<div class="animate-scale-in" style="color: #3b82f6; font-weight: 700; margin-top: 0.5rem;">Керемет! Ұзару дәл табылды.</div>`;
       if (window.playSound) playSound('correct');
+      if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
       if (window.triggerSalute) triggerSalute();
       feedbackBox.innerHTML = hookeLabState.feedbackX;
       input.disabled = true;

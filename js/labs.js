@@ -56,11 +56,7 @@ function showLabDetails(id) {
             <p style="color: var(--text-secondary); font-size: 1rem; font-weight: 600;">Зертханалық жұмыс №${lab.id}</p>
           </div>
         </div>
-        <div class="flex gap-3">
-          <button class="btn-primary v-center" style="gap: 0.6rem; padding: 0.8rem 1.5rem; font-size: 1rem; border-radius: 40px;" onclick="speak('${lab.title}. ${lab.desc}')">
-            <i data-lucide="volume-2" size="20"></i> Дыбыстау
-          </button>
-        </div>
+        <!-- Sound button removed -->
       </div>
       
       <div class="grid" style="grid-template-columns: 350px 1fr; gap: 2rem; align-items: start;">
@@ -94,10 +90,10 @@ function showLabDetails(id) {
     </div>
   `;
   lucide.createIcons();
-  speak(`${lab.title} зертханалық жұмысы ашылды.`);
+  /* speak() call removed */
 }
 
 function speakLabInstructions(topic) {
-  speak(`${topic} жұмысының барысы: Бірінші. Параметрлерді реттеп, тәжірибені бастаңыз. Екінші. Алынған мәліметтерді кестеге енгізіңіз. Үшінші. Тәжірибені бірнеше рет қайталаңыз.`);
+  /* speak() call removed */
 }
 

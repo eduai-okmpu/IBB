@@ -39,195 +39,27 @@
             filter: drop-shadow(0 0 80px rgba(32, 77, 118, 0.3));
         }
 
-        .atom {
+        .hero-animation {
+            width: 500px;
+            height: 500px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             position: relative;
-            width: 200px;
-            height: 200px;
-            perspective: 1500px;
-            transform-style: preserve-3d;
+            animation: slowRotate 24s linear infinite;
         }
 
-        .nucleus {
-            width: 66px;
-            height: 66px;
-            background: radial-gradient(circle at 30% 30%, #fff 0%, #f43f5e 40%, #881337 100%);
-            border-radius: 50%;
-            box-shadow:
-                0 0 30px rgba(244, 63, 94, 0.8),
-                0 0 60px rgba(244, 63, 94, 0.4),
-                inset -8px -8px 20px rgba(0, 0, 0, 0.6);
-            position: absolute;
-            top: 67px;
-            left: 67px;
-            z-index: 2;
-            animation: nucleusEnergy 4s ease-in-out infinite;
+        @keyframes slowRotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
 
-        @keyframes nucleusEnergy {
-
-            0%,
-            100% {
-                transform: scale(1);
-                box-shadow: 0 0 30px rgba(244, 63, 94, 0.8), 0 0 60px rgba(244, 63, 94, 0.4);
-            }
-
-            50% {
-                transform: scale(1.1);
-                box-shadow: 0 0 50px rgba(244, 63, 94, 1), 0 0 100px rgba(244, 63, 94, 0.6);
-            }
-        }
-
-        .orbit {
-            position: absolute;
-            border: 1.5px solid rgba(255, 255, 255, 0.08);
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            transition: all 0.6s ease;
-            box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.02);
-        }
-
-        /* Unique tilt for each orbit to create 3D sphere */
-        .orbit-1 {
-            width: 360px;
-            height: 140px;
-            border-color: rgba(244, 63, 94, 0.2);
-            animation: rot1 8s linear infinite;
-        }
-
-        .orbit-2 {
-            width: 360px;
-            height: 140px;
-            border-color: rgba(59, 130, 246, 0.2);
-            animation: rot2 10s linear infinite;
-        }
-
-        .orbit-3 {
-            width: 360px;
-            height: 140px;
-            border-color: rgba(168, 85, 247, 0.2);
-            animation: rot3 12s linear infinite;
-        }
-
-        .orbit-4 {
-            width: 360px;
-            height: 140px;
-            border-color: rgba(45, 212, 191, 0.2);
-            animation: rot4 14s linear infinite;
-        }
-
-        .orbit-5 {
-            width: 360px;
-            height: 140px;
-            border-color: rgba(251, 146, 60, 0.2);
-            animation: rot5 16s linear infinite;
-        }
-
-        .hero-animation:hover .orbit {
-            border-color: rgba(21, 19, 19, 0.3) !important;
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
-        }
-
-        /* Advanced 3D Rotations */
-        @keyframes rot1 {
-            from {
-                transform: translate(-50%, -50%) rotateX(60deg) rotateY(20deg) rotateZ(0deg);
-            }
-
-            to {
-                transform: translate(-50%, -50%) rotateX(60deg) rotateY(20deg) rotateZ(360deg);
-            }
-        }
-
-        @keyframes rot2 {
-            from {
-                transform: translate(-50%, -50%) rotateX(60deg) rotateY(-20deg) rotateZ(72deg);
-            }
-
-            to {
-                transform: translate(-50%, -50%) rotateX(60deg) rotateY(-20deg) rotateZ(432deg);
-            }
-        }
-
-        @keyframes rot3 {
-            from {
-                transform: translate(-50%, -50%) rotateX(30deg) rotateY(50deg) rotateZ(144deg);
-            }
-
-            to {
-                transform: translate(-50%, -50%) rotateX(30deg) rotateY(50deg) rotateZ(504deg);
-            }
-        }
-
-        @keyframes rot4 {
-            from {
-                transform: translate(-50%, -50%) rotateX(30deg) rotateY(-50deg) rotateZ(216deg);
-            }
-
-            to {
-                transform: translate(-50%, -50%) rotateX(30deg) rotateY(-50deg) rotateZ(576deg);
-            }
-        }
-
-        @keyframes rot5 {
-            from {
-                transform: translate(-50%, -50%) rotateX(0deg) rotateY(0deg) rotateZ(288deg);
-            }
-
-            to {
-                transform: translate(-50%, -50%) rotateX(0deg) rotateY(0deg) rotateZ(648deg);
-            }
-        }
-
-        .electron {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            position: absolute;
-            top: -8px;
-            left: 50%;
-            transform: translateX(-50%);
-            box-shadow: 0 0 25px currentColor;
-            z-index: 5;
-        }
-
-        /* Tail effect using multiple shadows */
-        .electron::after {
-            content: '';
-            position: absolute;
+        #atom-canvas {
             width: 100%;
             height: 100%;
-            border-radius: 50%;
-            filter: blur(4px);
-            box-shadow: -10px 0 15px currentColor, -20px 0 30px currentColor;
-            opacity: 0.6;
+            display: block;
         }
 
-        .orbit-1 .electron {
-            background: #f43f5e;
-            color: #f43f5e;
-        }
-
-        .orbit-2 .electron {
-            background: #3b82f6;
-            color: #3b82f6;
-        }
-
-        .orbit-3 .electron {
-            background: #a855f7;
-            color: #a855f7;
-        }
-
-        .orbit-4 .electron {
-            background: #2dd4bf;
-            color: #2dd4bf;
-        }
-
-        .orbit-5 .electron {
-            background: #fb923c;
-            color: #fb923c;
-        }
 
 
         /* Routing Views */
@@ -253,12 +85,9 @@
     </div>
     <!-- Accessibility Controls -->
     <!-- Accessibility Tools -->
-    <div class="a11y-panel" id="a11y-panel" style="display: none;">
+    <div class="a11y-panel" id="a11y-panel">
         <button id="toggle-a11y-menu" class="a11y-btn main-toggle" title="Баптаулар" aria-label="Баптаулар мәзірін ашу">
             <i data-lucide="settings"></i>
-        </button>
-        <button id="toggle-tts" class="a11y-btn" title="Дыбысты қосу/өшіру" aria-label="Дыбысты қосу/өшіру">
-            <i data-lucide="volume-2"></i>
         </button>
         <button id="toggle-contrast" class="a11y-btn" title="Жоғары контраст режимі"
             aria-label="Жоғары контраст режимі">
@@ -268,6 +97,9 @@
             <i data-lucide="type"></i>
             <span class="size-level"
                 style="font-size: 10px; font-weight: 800; position: absolute; bottom: 8px; right: 8px;">A</span>
+        </button>
+        <button id="toggle-calc-btn" class="a11y-btn" title="Калькулятор" aria-label="Калькуляторды ашу" onclick="toggleCalculator()">
+            <i data-lucide="calculator"></i>
         </button>
     </div>
 
@@ -316,23 +148,8 @@
                 </div>
                 <div class="flex items-center justify-center">
                     <div class="hero-animation">
-                        <div class="atom">
-                            <div class="nucleus"></div>
-                            <div class="orbit orbit-1">
-                                <div class="electron"></div>
-                            </div>
-                            <div class="orbit orbit-2">
-                                <div class="electron"></div>
-                            </div>
-                            <div class="orbit orbit-3">
-                                <div class="electron"></div>
-                            </div>
-                            <div class="orbit orbit-4">
-                                <div class="electron"></div>
-                            </div>
-                            <div class="orbit orbit-5">
-                                <div class="electron"></div>
-                            </div>
+                        <div class="hero-animation">
+                            <canvas id="atom-canvas"></canvas>
                         </div>
                     </div>
                 </div>
@@ -388,13 +205,13 @@
                             </div>
                             <div class="news-card">
                                 <div class="news-card-icon"
-                                    style="background: linear-gradient(135deg, #D6990022, #D6990044); border-color: #D6990033;">
-                                    <i data-lucide="volume-2" style="color:#D69900;"></i>
+                                    style="background: linear-gradient(135deg, #805AD522, #805AD544); border-color: #805AD533;">
+                                    <i data-lucide="flask-conical" style="color:#805AD5;"></i>
                                 </div>
-                                <span class="news-card-tag">Қолжетімділік</span>
-                                <h4>Дыбыстық сүйемелдеу жүйесі</h4>
-                                <p>Сайттағы барлық мәтіндер, тапсырмалар мен түсіндірмелер автоматты түрде дауыстап
-                                    оқылады (Text-to-Speech).</p>
+                                <span class="news-card-tag">Интерактивті</span>
+                                <h4>Виртуалды зертханалар</h4>
+                                <p>Физикалық құбылыстарды интерактивті симуляциялар арқылы тереңірек меңгеріп,
+                                    тәжірибелер жасауға мүмкіндік береді.</p>
                             </div>
                             <!-- Set 2 (Duplicates for Seamless Loop) -->
                             <div class="news-card">
@@ -523,6 +340,8 @@
         <section id="student-lessons-view" class="view container"></section>
         <section id="student-lesson-play-view" class="view container"></section>
         <section id="labs-view" class="view container"></section>
+        <section id="workbook-view" class="view container"></section>
+        <section id="shop-view" class="view container"></section>
 
         <!-- Motivation Modal for Quizzes -->
         <div id="motivation-modal" class="motivation-pop" style="display:none;">
@@ -696,7 +515,7 @@
     </div>
 
     <!-- Calculator Modal -->
-    Е<div id="calc-modal" class="calc-backdrop" style="display: none;"
+    <div id="calc-modal" class="calc-backdrop" style="display: none;"
         onclick="if(event.target === this) toggleCalculator()">
         <div class="calc-modal">
             <div id="calc-display" class="calc-display">0</div>
@@ -726,24 +545,21 @@
         </div>
     </div>
 
-    <!-- Floating Calculator Button -->
-    <button class="floating-calc-btn voice-target" onclick="toggleCalculator()" title="Калькулятор"
-        aria-label="Калькуляторды ашу" style="display: none;">
-        <i data-lucide="calculator"></i>
-    </button>
-
     <!-- Scripts -->
-    <script src="js/lessons_data.js?v=2.9"></script>
-    <script src="js/app.js?v=2.9"></script>
-    <script src="js/accessibility.js?v=2.9"></script>
-    <script src="js/teacher.js?v=2.9"></script>
-    <script src="js/student.js?v=2.9"></script>
-    <script src="js/labs.js?v=2.9"></script>
-    <script src="js/books.js?v=2.9"></script>
+    <script src="js/phet_data.js?v=3.2"></script>
+    <script src="js/lessons_data.js?v=3.2"></script>
+    <script src="js/app.js?v=3.2"></script>
+    <script src="js/accessibility.js?v=3.2"></script>
+    <script src="js/teacher.js?v=3.2"></script>
+    <script src="js/student.js?v=3.2"></script>
+    <script src="js/labs.js?v=3.2"></script>
+    <script src="js/games.js?v=3.2"></script>
+    <script src="js/books.js?v=3.2"></script>
     <script>
         // Init Lucide Icons
         lucide.createIcons();
     </script>
+    <script src="js/hero-atom.js"></script>
 </body>
 
 </html>
