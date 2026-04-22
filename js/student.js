@@ -18,28 +18,25 @@ let activeQuestionIndex = 0;
  * Calculates total score based on progress of all 10 lessons in localStorage
  */
 function calculateTotalStudentScore() {
+  const p = window.state ? window.state.studentProfile : null;
+  if (!p) return 0;
+  
   let total = 0;
-  // Lessons are indexed 1 to 10
-  for (let i = 1; i <= 10; i++) {
-    const saved = localStorage.getItem(`lesson_progress_${i}`);
-    if (saved) {
-      try {
-        const lessonState = JSON.parse(saved);
-        // ONLY count points if the lesson was fully finished
-        if (lessonState.isCompleted && lessonState.pointsPerStage) {
-          total += lessonState.pointsPerStage.reduce((sum, p) => sum + (p || 0), 0);
-        }
-      } catch (e) {
-        console.error("Error parsing lesson progress", i, e);
+  
+  // Calculate points from cloud-synced lesson progress
+  if (p.lessonProgress) {
+    for (const lessonId in p.lessonProgress) {
+      const lessonState = p.lessonProgress[lessonId];
+      // Count points from all completed stages in the lesson
+      if (lessonState && lessonState.pointsPerStage) {
+        total += lessonState.pointsPerStage.reduce((sum, pts) => sum + (pts || 0), 0);
       }
     }
   }
   
-  // Subtract points spent in the shop if studentProfile exists
-  if (window.state && window.state.studentProfile) {
-    total += (window.state.studentProfile.assignmentPoints || 0);
-    total -= (window.state.studentProfile.spentPoints || 0);
-  }
+  // Add manual points and subtract spent points
+  total += (p.assignmentPoints || 0);
+  total -= (p.spentPoints || 0);
   
   return Math.max(0, total);
 }
@@ -52,14 +49,16 @@ function playStudentLesson(lessonId) {
   activeLessonIndex = allLessonsData.findIndex(l => l.id === lessonId);
   if (activeLessonIndex === -1) return;
   
-  const saved = localStorage.getItem(`lesson_progress_${lessonId}`);
-  if (saved) {
-    activeLessonState = JSON.parse(saved);
-    // Ensure new fields exist for legacy saved states
-    if (activeLessonState.pointsPerStage === undefined) activeLessonState.pointsPerStage = [0, 0, 0, 0, 0];
-    if (activeLessonState.labAttempts === undefined) activeLessonState.labAttempts = 0;
-    if (activeLessonState.isCompleted === undefined) activeLessonState.isCompleted = false;
-    if (activeLessonState.introViewed === undefined) activeLessonState.introViewed = true; // Legacy
+  const p = window.state.studentProfile;
+  const cloudData = p && p.lessonProgress ? p.lessonProgress[lessonId] : null;
+  const localData = localStorage.getItem(`lesson_progress_${lessonId}`);
+
+  if (cloudData) {
+    activeLessonState = cloudData;
+  } else if (localData) {
+    activeLessonState = JSON.parse(localData);
+    // Migration: if we have local but no cloud, save to cloud
+    saveLessonProgressLocally();
   } else {
     activeLessonState = { 
       currentStage: 0, 
@@ -108,25 +107,22 @@ function processStageCompletion(stageIndex, points = 20) {
 }
 
 function awardPoints(points) {
-  // Recalculate everything to be sure
-  const totalCalculated = calculateTotalStudentScore();
-  
   if (window.state && window.state.studentProfile) {
-    window.state.studentProfile.score = totalCalculated;
+    const p = window.state.studentProfile;
+    p.score = (p.score || 0) + points;
     
-    // Update real-time UI
+    // Update UI immediately (Optimistic UI)
     const scoreEls = document.querySelectorAll('.rating-score-value');
-    scoreEls.forEach(el => {
-      el.innerText = totalCalculated;
-    });
+    scoreEls.forEach(el => el.innerText = p.score);
     
-    // Save to global local storage
-    if (typeof saveState === 'function') saveState();
+    // Save to server
+    saveProgressToSheets(points);
+    
+    // Sync other profile data
+    if (typeof syncProfileWithSheets === 'function') syncProfileWithSheets();
   }
-  
-  // Call to Google Sheets conceptually
-  saveProgressToSheets(points);
 }
+
 
 async function saveProgressToSheets(points) {
   if (!window.state) return;
@@ -134,27 +130,50 @@ async function saveProgressToSheets(points) {
   if (!email) return;
   
   try {
-    const GOOGLE_SCRIPTS_AUTH_URL = 'https://script.google.com/macros/s/AKfycbzsHO8t7TM04Sohp6Lq6nuYzLoSvJOHy_fI4MA0wW7qv6tUxUkwpzUHXVpcmrNMtc_zfg/exec';
-    const response = await fetch(GOOGLE_SCRIPTS_AUTH_URL, {
+    const url = window.GOOGLE_SCRIPTS_AUTH_URL;
+    const response = await fetch(url, {
       method: "POST",
       body: JSON.stringify({
         action: "saveScore",
-        email: window.state.userEmail,
+        email: email,
         scoreToAdd: points
       })
     });
     const data = await response.json();
+    
     if (data.success && window.state.studentProfile) {
       window.state.studentProfile.score = data.newScore;
+      
+      // Update real-time UI
+      const scoreEls = document.querySelectorAll('.rating-score-value');
+      scoreEls.forEach(el => {
+        el.innerText = data.newScore;
+      });
+      
+      // Save locally
+      if (typeof saveState === 'function') saveState();
     }
   } catch (err) {
-    console.log("Could not push score to sheets", err);
+    console.warn("Could not push score to sheets", err);
   }
 }
 
 function saveLessonProgressLocally() {
   const lesson = allLessonsData[activeLessonIndex];
+  if (!lesson) return;
+  
+  // Save to LocalStorage as backup
   localStorage.setItem(`lesson_progress_${lesson.id}`, JSON.stringify(activeLessonState));
+  
+  // Save to State (Cloud)
+  if (window.state && window.state.studentProfile) {
+    if (!window.state.studentProfile.lessonProgress) window.state.studentProfile.lessonProgress = {};
+    window.state.studentProfile.lessonProgress[lesson.id] = activeLessonState;
+    
+    // Trigger sync
+    if (typeof syncProfileWithSheets === 'function') syncProfileWithSheets();
+    if (typeof saveState === 'function') saveState();
+  }
 }
 
 function goNextLessonStage() {
@@ -976,11 +995,10 @@ window.showStudentLessons = function (containerId = 'student-content', backFnNam
 
       <div class="lesson-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 2rem;">
         ${lessons.map(lesson => {
-          // Check progress from localStorage
-          const saved = localStorage.getItem(`lesson_progress_${lesson.id}`);
-          const state = saved ? JSON.parse(saved) : null;
-          const completed = state && state.stagesCompleted && state.stagesCompleted[4];
-          const progress = (state && state.stagesCompleted) ? (state.stagesCompleted.filter(s => s).length / 5) * 100 : 0;
+          const p = window.state.studentProfile;
+          const lessonProgress = (p && p.lessonProgress) ? p.lessonProgress[lesson.id] : null;
+          const completed = lessonProgress && lessonProgress.isCompleted;
+          const progress = lessonProgress ? (lessonProgress.stagesCompleted.filter(s => s).length / 5) * 100 : 0;
 
           return `
             <div class="lesson-topic-card voice-target" onclick="playStudentLesson(${lesson.id})" style="position: relative;">
@@ -1176,15 +1194,19 @@ window.buyShopItem = function(type, itemId) {
     p.spentPoints = (p.spentPoints || 0) + item.price;
     p.inventory.push(itemId);
     
+    // Subtract from local score immediately (Optimistic UI)
+    p.score = Math.max(0, (p.score || 0) - item.price);
+    
+    // Sync subtraction to cloud
+    saveProgressToSheets(-item.price);
+
     // Automatically equip after buy
     if (type === 'avatar') p.activeIcon = item.icon;
     else if (type === 'frame') p.activeFrame = item.style;
     else p.activeTitle = item.name;
 
-    // Force score recalculation for visual feedback
-    p.score = calculateTotalStudentScore();
-
     if (typeof saveState === 'function') saveState();
+    if (typeof syncProfileWithSheets === 'function') syncProfileWithSheets();
     
     // Refresh shop and dashboard
     if (typeof renderShop === 'function') renderShop();
@@ -1213,6 +1235,7 @@ window.equipShopItem = function(type, itemId) {
   }
 
   if (typeof saveState === 'function') saveState();
+  if (typeof syncProfileWithSheets === 'function') syncProfileWithSheets();
   if (typeof renderShop === 'function') renderShop();
   if (typeof renderStudentDashboard === 'function') renderStudentDashboard();
 };

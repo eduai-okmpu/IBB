@@ -137,6 +137,33 @@ window.sendTeacherAIMessage = async function () {
 let currentManagerTab = 'list'; // 'list' or 'results'
 let currentStudentAuthData = []; // Full user data from Google Sheet
 
+window.calculateStudentGeneralProgress = function (authInfo) {
+  if (!authInfo) return 0;
+  // Look for 'lessonprogress' or fall back to empty key '' which sometimes comes from unnamed columns
+  const progressKey = Object.keys(authInfo).find(k => k.toLowerCase() === 'lessonprogress') || 
+                      Object.keys(authInfo).find(k => k === '');
+  
+  if (!progressKey || !authInfo[progressKey]) return 0;
+
+  try {
+    const rawData = authInfo[progressKey];
+    const progress = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+    let totalStages = 0;
+    const lessonCount = 10;
+    const stagesPerLesson = 5;
+
+    for (let i = 1; i <= lessonCount; i++) {
+      const lessonState = progress[i];
+      if (lessonState && lessonState.stagesCompleted) {
+        totalStages += lessonState.stagesCompleted.filter(s => s).length;
+      }
+    }
+    return Math.round((totalStages / (lessonCount * stagesPerLesson)) * 100);
+  } catch (e) {
+    return 0;
+  }
+};
+
 window.syncStudentsWithServer = async function () {
   const loading = document.getElementById('auth-loading');
   if (loading) loading.style.display = 'flex';
@@ -451,11 +478,12 @@ window.filterClassManager = function () {
     thead.innerHTML = `
       <tr class="label-caps" style="text-align: left; opacity: 0.6;">
         <th class="col-student">Оқушы</th>
-        <th class="col-grade">Сынып</th>
-        <th class="col-school">Мектеп</th>
+        <th class="col-progress">Жалпы Прогресс</th>
         <th class="col-action">Әрекет</th>
       </tr>
     `;
+
+
 
     let filteredStudents = state.allStudents.filter(s => {
       const sGrade = (s.grade || '').trim().toLowerCase().replace(/["']/g, '').replace(/[aа]/g, 'а').replace(/[eе]/g, 'е').replace(/[oо]/g, 'о').replace(/[kк]/g, 'к');
@@ -477,6 +505,9 @@ window.filterClassManager = function () {
     } else {
       tbody.innerHTML = filteredStudents.map(s => {
         const authInfo = currentStudentAuthData.find(u => String(u.email || '').toLowerCase() === String(s.email || '').toLowerCase());
+        const totalProgress = window.calculateStudentGeneralProgress(authInfo);
+        let progressColor = totalProgress < 30 ? '#ef4444' : (totalProgress < 70 ? '#f59e0b' : '#10b981');
+
         return `
           <tr class="student-row animate-hover" onclick="window.showStudentDetail('${s.email}')" style="background: rgba(255,255,255,0.4); backdrop-filter: blur(8px); border-radius: 16px; transition: all 0.2s ease; cursor: pointer;">
             <td class="col-student" style="border-radius: 16px 0 0 16px;">
@@ -488,8 +519,17 @@ window.filterClassManager = function () {
                 </div>
               </div>
             </td>
-            <td class="col-grade">${s.grade}</td>
-            <td class="col-school" style="font-size: 0.85rem; color: var(--text-secondary);">${s.school}</td>
+            <td class="col-progress">
+              <div class="flex flex-col gap-1" style="min-width: 151px; padding-right: 1.5rem;">
+                <div class="flex justify-between items-center" style="font-size: 0.7rem; font-weight: 800;">
+                  <span style="color: var(--text-secondary);">Орындалуы:</span>
+                  <span style="color: ${progressColor};">${totalProgress}%</span>
+                </div>
+                <div style="height: 6px; background: rgba(0,0,0,0.05); border-radius: 10px; overflow: hidden; width: 100%;">
+                  <div style="width: ${totalProgress}%; height: 100%; background: ${progressColor}; border-radius: 10px; transition: width 1s ease-out;"></div>
+                </div>
+              </div>
+            </td>
             <td class="col-action" style="border-radius: 0 16px 16px 0;">
               <button class="btn-secondary" style="padding: 0.5rem; border-radius: 10px; color: #ef4444; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;" onclick="event.stopPropagation(); deleteStudentFromState(${s.id})"><i data-lucide="trash-2" size="18"></i></button>
             </td>

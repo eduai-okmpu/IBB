@@ -40,7 +40,8 @@ const defaultState = {
     activeIcon: null,
     activeTitle: null,
     spentPoints: 0,
-    assignmentPoints: 0
+    assignmentPoints: 0,
+    lessonProgress: {}
   },
   quizResults: [],
   allStudents: [],
@@ -218,7 +219,8 @@ function goBack() {
   }
 }
 
-const GOOGLE_SCRIPTS_AUTH_URL = 'https://script.google.com/macros/s/AKfycbzsHO8t7TM04Sohp6Lq6nuYzLoSvJOHy_fI4MA0wW7qv6tUxUkwpzUHXVpcmrNMtc_zfg/exec';
+window.GOOGLE_SCRIPTS_AUTH_URL = 'https://script.google.com/macros/s/AKfycbzsHO8t7TM04Sohp6Lq6nuYzLoSvJOHy_fI4MA0wW7qv6tUxUkwpzUHXVpcmrNMtc_zfg/exec';
+const GOOGLE_SCRIPTS_AUTH_URL = window.GOOGLE_SCRIPTS_AUTH_URL;
 
 window.callAI = async function (text) {
   const email = state.user === 'teacher' ? (state.teacherProfile.email || 'teacher@demo.com') : (state.studentProfile.email || 'student@demo.com');
@@ -237,134 +239,162 @@ window.callAI = async function (text) {
   }
 };
 
-window.openAuthModal = function (mode = 'login') {
-  const modal = document.getElementById('auth-modal');
-  if (modal) {
-    modal.style.display = 'flex';
-    toggleAuthMode(mode);
-  }
-};
+window.syncProfileWithSheets = async function () {
+    const email = state.userEmail || (state.studentProfile ? state.studentProfile.email : null);
+    if (!email || state.user !== 'student') return;
 
-window.closeAuthModal = function () {
-  const modal = document.getElementById('auth-modal');
-  if (modal) modal.style.display = 'none';
-};
+    const profile = state.studentProfile;
+    try {
+      const response = await fetch(GOOGLE_SCRIPTS_AUTH_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "updateProfile",
+          email: email,
+          name: profile.name,
+          inventory: profile.inventory,
 
-window.toggleAuthMode = function (mode) {
-  const loginView = document.getElementById('login-form-view');
-  const registerView = document.getElementById('register-form-view');
-  if (loginView && registerView) {
-    loginView.style.display = mode === 'login' ? 'block' : 'none';
-    registerView.style.display = mode === 'register' ? 'block' : 'none';
-  }
-};
+          activeFrame: profile.activeFrame,
+          activeIcon: profile.activeIcon,
+          activeTitle: profile.activeTitle,
+          achievements: profile.achievements,
+          spentPoints: profile.spentPoints,
+          assignmentPoints: profile.assignmentPoints,
+          lessonProgress: profile.lessonProgress || {}
+        })
+      });
+      return await response.json();
+    } catch (error) {
+      console.warn('Sync Profile Error:', error);
+      return { success: false, message: error.message };
+    }
+  };
 
-window.handleAuthSubmit = async function (mode) {
-  const loading = document.getElementById('auth-loading');
-  const emailVal = document.getElementById(mode === 'login' ? 'login-email' : 'reg-email').value;
-  let params = new URLSearchParams({ action: mode });
+  window.openAuthModal = function (mode = 'login') {
+    const modal = document.getElementById('auth-modal');
+    if (modal) {
+      modal.style.display = 'flex';
+      toggleAuthMode(mode);
+    }
+  };
 
-  if (mode === 'login') {
-    const password = document.getElementById('login-password').value;
-    if (!emailVal || !password) return alert('Мәліметтерді толтырыңыз');
-    params.append('email', emailVal);
-    params.append('password', password);
-  } else {
-    const name = document.getElementById('reg-name').value;
-    const role = document.getElementById('reg-role').value;
-    const password = document.getElementById('reg-password').value;
-    if (!name || !emailVal || !password) return alert('Барлық өрістерді толтырыңыз');
-    params.append('name', name);
-    params.append('role', role);
-    params.append('email', emailVal);
-    params.append('password', password);
-  }
+  window.closeAuthModal = function () {
+    const modal = document.getElementById('auth-modal');
+    if (modal) modal.style.display = 'none';
+  };
 
-  if (loading) loading.style.display = 'flex';
+  window.toggleAuthMode = function (mode) {
+    const loginView = document.getElementById('login-form-view');
+    const registerView = document.getElementById('register-form-view');
+    if (loginView && registerView) {
+      loginView.style.display = mode === 'login' ? 'block' : 'none';
+      registerView.style.display = mode === 'register' ? 'block' : 'none';
+    }
+  };
 
-  try {
-    const url = `${GOOGLE_SCRIPTS_AUTH_URL}?${params.toString()}`;
+  window.handleAuthSubmit = async function (mode) {
+    const loading = document.getElementById('auth-loading');
+    const emailVal = document.getElementById(mode === 'login' ? 'login-email' : 'reg-email').value;
+    let params = new URLSearchParams({ action: mode });
 
-    let name = emailVal ? emailVal.split('@')[0] : 'User';
-    let role = 'student';
-
-    // Сақтандыру: егер профильдер объектісі жасалмаған болса, оларға бос объект береміз.
-    if (!state.teacherProfile) state.teacherProfile = {};
-    if (!state.studentProfile) state.studentProfile = {};
-
-    if (mode === 'register') {
-      name = document.getElementById('reg-name').value;
-      role = document.getElementById('reg-role').value;
-
-      if (role === 'teacher') {
-        state.teacherProfile.name = name;
-        state.teacherProfile.email = emailVal;
-      } else {
-        state.studentProfile.name = name;
-        state.studentProfile.email = emailVal;
-      }
+    if (mode === 'login') {
+      const password = document.getElementById('login-password').value;
+      if (!emailVal || !password) return alert('Мәліметтерді толтырыңыз');
+      params.append('email', emailVal);
+      params.append('password', password);
     } else {
-      if (emailVal.includes('teacher')) {
-        role = 'teacher';
-        state.teacherProfile.email = emailVal;
-      } else {
-        role = 'student';
-        state.studentProfile.email = emailVal;
-      }
+      const name = document.getElementById('reg-name').value;
+      const role = document.getElementById('reg-role').value;
+      const password = document.getElementById('reg-password').value;
+      if (!name || !emailVal || !password) return alert('Барлық өрістерді толтырыңыз');
+      params.append('name', name);
+      params.append('role', role);
+      params.append('email', emailVal);
+      params.append('password', password);
     }
 
-    console.warn('Жүйеге жергілікті түрде кіру (Офлайн режим) іске қосылды.');
-    state.userEmail = emailVal;
+    if (loading) loading.style.display = 'flex';
 
-    login(role);
-    closeAuthModal();
+    try {
+      const url = `${GOOGLE_SCRIPTS_AUTH_URL}?${params.toString()}`;
+      const response = await fetch(url);
+      const data = await response.json();
 
-  } catch (error) {
-    console.error('Auth Error:', error);
-    alert('Жүйелік қате: ' + error.message);
-  } finally {
-    if (loading) loading.style.display = 'none';
+      if (data.success) {
+        state.userEmail = emailVal;
+        const role = data.user.role || (mode === 'register' ? document.getElementById('reg-role').value : 'student');
+
+        if (role === 'teacher') {
+          state.teacherProfile = { ...state.teacherProfile, name: data.user.name, email: emailVal };
+        } else {
+          state.studentProfile = {
+            ...state.studentProfile,
+            name: data.user.name,
+            email: emailVal,
+            score: data.user.score || 0,
+            inventory: data.user.inventory || [],
+            activeFrame: data.user.activeFrame || '',
+            activeIcon: data.user.activeIcon || '',
+            activeTitle: data.user.activeTitle || '',
+            achievements: data.user.achievements || [],
+            spentPoints: data.user.spentPoints || 0,
+            assignmentPoints: data.user.assignmentPoints || 0,
+            lessonProgress: data.user.lessonProgress || {}
+          };
+        }
+
+        login(role);
+        closeAuthModal();
+        if (mode === 'register') alert('Тіркелу сәтті аяқталды!');
+      } else {
+        alert(data.message || 'Қате орын алды');
+      }
+
+    } catch (error) {
+      console.error('Auth Error:', error);
+      alert('Жүйелік қате: ' + error.message);
+    } finally {
+      if (loading) loading.style.display = 'none';
+    }
+  };
+
+  function login(role) {
+    state.user = role;
+    state.history = ['home', role];
+    saveState();
+    navigate(role, false);
   }
-};
 
-function login(role) {
-  state.user = role;
-  state.history = ['home', role];
-  saveState();
-  navigate(role, false);
-}
+  function logout() {
+    state.user = null;
+    state.history = ['home'];
 
-function logout() {
-  state.user = null;
-  state.history = ['home'];
+    // Clear AI chat sessions
+    if (window.clearStudentAIChat) window.clearStudentAIChat();
+    if (window.clearTeacherAIChat) window.clearTeacherAIChat();
 
-  // Clear AI chat sessions
-  if (window.clearStudentAIChat) window.clearStudentAIChat();
-  if (window.clearTeacherAIChat) window.clearTeacherAIChat();
+    saveState();
+    navigate('home', false);
+  }
 
-  saveState();
-  navigate('home', false);
-}
-
-function navigateHome() {
-  if (state.user) {
-    navigate(state.user);
-  } else {
-    // If guest clicks start/logo, show auth modal for better UX
-    if (state.view === 'home') {
-      openAuthModal('register');
+  function navigateHome() {
+    if (state.user) {
+      navigate(state.user);
     } else {
-      navigate('home');
+      // If guest clicks start/logo, show auth modal for better UX
+      if (state.view === 'home') {
+        openAuthModal('register');
+      } else {
+        navigate('home');
+      }
     }
   }
-}
 
-function renderLabs(category = null) {
-  const labsView = document.getElementById('labs-view');
-  if (!labsView) return;
+  function renderLabs(category = null) {
+    const labsView = document.getElementById('labs-view');
+    if (!labsView) return;
 
-  if (!category) {
-    labsView.innerHTML = `
+    if (!category) {
+      labsView.innerHTML = `
       <div class="animate-fade-in" style="padding: 1rem;">
         <h2 style="font-size: 2.2rem; font-weight: 800; margin-bottom: 2.5rem; color: var(--text-primary);" class="voice-target">Зертханалық жұмыстар</h2>
         
@@ -397,17 +427,17 @@ function renderLabs(category = null) {
         </div>
       </div>
     `;
+    }
+    lucide.createIcons();
   }
-  lucide.createIcons();
-}
 
-function renderPhysicsAccessLabs() {
-  const labsView = document.getElementById('labs-view');
-  if (!labsView) return;
+  function renderPhysicsAccessLabs() {
+    const labsView = document.getElementById('labs-view');
+    if (!labsView) return;
 
-  const colors = ['#f26d21', '#6366f1', '#22c55e', '#ef4444', '#06b6d4', '#ec4899', '#8b5cf6', '#3b82f6', '#f97316', '#10b981'];
+    const colors = ['#f26d21', '#6366f1', '#22c55e', '#ef4444', '#06b6d4', '#ec4899', '#8b5cf6', '#3b82f6', '#f97316', '#10b981'];
 
-  labsView.innerHTML = `
+    labsView.innerHTML = `
     <div class="animate-fade-in" style="padding: 1rem;">
       <button class="btn-secondary v-center" style="margin-bottom: 2rem; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="renderLabs()">
         <i data-lucide="arrow-left" size="18"></i> Артқа
@@ -431,16 +461,16 @@ function renderPhysicsAccessLabs() {
       </div>
     </div>
   `;
-  lucide.createIcons();
-}
+    lucide.createIcons();
+  }
 
-function renderPhetLabsList() {
-  const labsView = document.getElementById('labs-view');
-  if (!labsView || typeof PHET_LABS_DATA === 'undefined') return;
+  function renderPhetLabsList() {
+    const labsView = document.getElementById('labs-view');
+    if (!labsView || typeof PHET_LABS_DATA === 'undefined') return;
 
-  const colors = ['#3b82f6', '#6366f1', '#22c55e', '#ef4444', '#06b6d4', '#ec4899', '#8b5cf6', '#f59e0b', '#10b981', '#64748b'];
+    const colors = ['#3b82f6', '#6366f1', '#22c55e', '#ef4444', '#06b6d4', '#ec4899', '#8b5cf6', '#f59e0b', '#10b981', '#64748b'];
 
-  labsView.innerHTML = `
+    labsView.innerHTML = `
     <div class="animate-fade-in" style="padding: 1rem;">
       <button class="btn-secondary v-center" style="margin-bottom: 2rem; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="renderLabs()">
         <i data-lucide="arrow-left" size="18"></i> Артқа
@@ -472,17 +502,17 @@ function renderPhetLabsList() {
       </div>
     </div>
   `;
-  lucide.createIcons();
-}
+    lucide.createIcons();
+  }
 
-function showPhetLabDetail(id) {
-  const labsView = document.getElementById('labs-view');
-  if (!labsView || typeof PHET_LABS_DATA === 'undefined') return;
+  function showPhetLabDetail(id) {
+    const labsView = document.getElementById('labs-view');
+    if (!labsView || typeof PHET_LABS_DATA === 'undefined') return;
 
-  const lab = PHET_LABS_DATA.find(l => l.id === id);
-  if (!lab) return;
+    const lab = PHET_LABS_DATA.find(l => l.id === id);
+    if (!lab) return;
 
-  labsView.innerHTML = `
+    labsView.innerHTML = `
     <div class="flex flex-col gap-6 animate-fade-in" style="height: 100%; padding-bottom: 2rem;">
       <div class="flex justify-between items-center">
         <div class="flex items-center gap-4">
@@ -540,50 +570,50 @@ function showPhetLabDetail(id) {
       </div>
     </div>
   `;
-  lucide.createIcons();
-}
+    lucide.createIcons();
+  }
 
-function showPhysicsAccessLab(type) {
-  const container = document.getElementById('labs-view');
-  if (!container) return;
+  function showPhysicsAccessLab(type) {
+    const container = document.getElementById('labs-view');
+    if (!container) return;
 
-  const backBtn = `
+    const backBtn = `
     <button class="btn-secondary v-center" style="margin-bottom: 1.5rem; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="renderPhysicsAccessLabs()">
       <i data-lucide="arrow-left" size="18"></i> Тізімге оралу
     </button>
   `;
 
-  const labRenders = {
-    'freefall': () => renderFreeFallLab(true),
-    'impulse': renderImpulseLab,
-    'hooke': renderHookeLab,
-    'newton1': renderNewton1Lab,
-    'newton2': renderNewton2Lab,
-    'newton3': renderNewton3Lab,
-    'gravity': renderGravityLab,
-    'density': renderDensityLab,
-    'pressure': renderPressureLab,
-    'archimedes': renderArchimedesLab
-  };
+    const labRenders = {
+      'freefall': () => renderFreeFallLab(true),
+      'impulse': renderImpulseLab,
+      'hooke': renderHookeLab,
+      'newton1': renderNewton1Lab,
+      'newton2': renderNewton2Lab,
+      'newton3': renderNewton3Lab,
+      'gravity': renderGravityLab,
+      'density': renderDensityLab,
+      'pressure': renderPressureLab,
+      'archimedes': renderArchimedesLab
+    };
 
-  if (labRenders[type]) {
-    container.innerHTML = backBtn + labRenders[type]();
-    lucide.createIcons();
+    if (labRenders[type]) {
+      container.innerHTML = backBtn + labRenders[type]();
+      lucide.createIcons();
+    }
   }
-}
 
-/**
- * Teacher & Student logic moved to respective files
- */
+  /**
+   * Teacher & Student logic moved to respective files
+   */
 
-function renderWorkbook() {
-  const container = document.getElementById('workbook-view');
-  if (!container) return;
+  function renderWorkbook() {
+    const container = document.getElementById('workbook-view');
+    if (!container) return;
 
-  const backView = state.user === 'teacher' ? 'teacher' : 'student';
-  const label = "Физика пәнінен функционалдық сауаттылықты дамытуға арналған оқушының жұмыс дәптері";
+    const backView = state.user === 'teacher' ? 'teacher' : 'student';
+    const label = "Физика пәнінен функционалдық сауаттылықты дамытуға арналған оқушының жұмыс дәптері";
 
-  container.innerHTML = `
+    container.innerHTML = `
     <div class="animate-fade-in" style="padding: 1rem;">
       <button class="btn-secondary v-center" style="margin-bottom: 2rem; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="navigate('${backView}')">
         <i data-lucide="arrow-left" size="18"></i> Артқа
@@ -603,26 +633,26 @@ function renderWorkbook() {
       </div>
     </div>
   `;
-  if (window.lucide) lucide.createIcons();
-}
+    if (window.lucide) lucide.createIcons();
+  }
 
-window.activeShopCategory = null;
-window.setShopCategory = function (cat) {
-  window.activeShopCategory = cat;
-  renderShop();
-};
+  window.activeShopCategory = null;
+  window.setShopCategory = function (cat) {
+    window.activeShopCategory = cat;
+    renderShop();
+  };
 
-function renderShop() {
-  const container = document.getElementById('shop-view');
-  if (!container) return;
+  function renderShop() {
+    const container = document.getElementById('shop-view');
+    if (!container) return;
 
-  const p = state.studentProfile;
-  if (!p.inventory) p.inventory = [];
+    const p = state.studentProfile;
+    if (!p.inventory) p.inventory = [];
 
-  const category = window.activeShopCategory;
+    const category = window.activeShopCategory;
 
-  // Header with back button and points
-  let headerHtml = `
+    // Header with back button and points
+    let headerHtml = `
     <div class="v-center justify-between" style="margin-bottom: 2rem;">
       <button class="btn-secondary v-center" style="gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="${category ? 'setShopCategory(null)' : "navigate('student')"}">
         <i data-lucide="arrow-left" size="18"></i> ${category ? 'Мәзірге' : 'Артқа'}
@@ -635,9 +665,9 @@ function renderShop() {
     </div>
   `;
 
-  if (!category) {
-    // Menu View
-    container.innerHTML = `
+    if (!category) {
+      // Menu View
+      container.innerHTML = `
       <div class="animate-fade-in" style="padding: 1rem;">
         ${headerHtml}
         <div class="dashboard-header text-center" style="margin-bottom: 3rem;">
@@ -675,19 +705,19 @@ function renderShop() {
         </div>
       </div>
     `;
-  } else {
-    // Category View
-    let contentHtml = '';
-    let title = '';
+    } else {
+      // Category View
+      let contentHtml = '';
+      let title = '';
 
-    if (category === 'avatar') {
-      title = 'Ғалымдар Аватарлары';
-      contentHtml = `
+      if (category === 'avatar') {
+        title = 'Ғалымдар Аватарлары';
+        contentHtml = `
         <div class="grid gap-6" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
           ${SHOP_CATALOG.avatars.map(item => {
-        const isOwned = p.inventory.includes(item.id);
-        const isActive = p.activeIcon === item.icon;
-        return `
+          const isOwned = p.inventory.includes(item.id);
+          const isActive = p.activeIcon === item.icon;
+          return `
               <div class="glass-card flex flex-col items-center text-center gap-4 animate-hover" style="padding: 2rem; border: 1.5px solid ${isActive ? 'var(--accent-orange)' : 'var(--border-glass)'};">
                 <div style="width: 80px; height: 80px; border-radius: 50%; background: ${item.bgColor}; display: flex; align-items: center; justify-content: center; color: ${item.color}; box-shadow: 0 8px 16px rgba(0,0,0,0.1); overflow: hidden;">
                   ${item.image ? `<img src="${item.image}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i data-lucide="${item.icon}" size="36"></i>`}
@@ -709,17 +739,17 @@ function renderShop() {
                 </div>
               </div>
             `;
-      }).join('')}
+        }).join('')}
         </div>
       `;
-    } else if (category === 'title') {
-      title = 'Құрметті Титулдар';
-      contentHtml = `
+      } else if (category === 'title') {
+        title = 'Құрметті Титулдар';
+        contentHtml = `
         <div class="grid gap-6" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
           ${SHOP_CATALOG.titles.map(item => {
-        const isOwned = p.inventory.includes(item.id);
-        const isActive = p.activeTitle === item.name;
-        return `
+          const isOwned = p.inventory.includes(item.id);
+          const isActive = p.activeTitle === item.name;
+          return `
               <div class="glass-card flex flex-col items-center text-center gap-4 animate-hover" style="padding: 1.5rem; border: 1.5px solid ${isActive ? 'var(--accent-orange)' : 'var(--border-glass)'};">
                 <div style="display: inline-block; padding: 0.4rem 1.2rem; border-radius: 50px; font-size: 0.9rem; font-weight: 800; letter-spacing: 0.5px; ${item.style || 'background: #fffcf0; border: 1px solid #fbbf24; color: #92400e;'}">
                   «${item.name}»
@@ -740,17 +770,17 @@ function renderShop() {
                 </div>
               </div>
             `;
-      }).join('')}
+        }).join('')}
         </div>
       `;
-    } else if (category === 'frame') {
-      title = 'Бейін Рамкалары';
-      contentHtml = `
+      } else if (category === 'frame') {
+        title = 'Бейін Рамкалары';
+        contentHtml = `
         <div class="grid gap-6" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
           ${SHOP_CATALOG.frames.map(item => {
-        const isOwned = p.inventory.includes(item.id);
-        const isActive = p.activeFrame === item.style;
-        return `
+          const isOwned = p.inventory.includes(item.id);
+          const isActive = p.activeFrame === item.style;
+          return `
               <div class="glass-card flex flex-col items-center text-center gap-4 animate-hover" style="padding: 2rem; border: 1.5px solid ${isActive ? 'var(--accent-orange)' : 'var(--border-glass)'};">
                 <div style="width: 80px; height: 80px; border-radius: 50%; ${item.style} display: flex; align-items: center; justify-content: center;">
                   <div style="width: 60px; height: 60px; border-radius: 50%; background: var(--bg-glass-bright); display: flex; align-items: center; justify-content: center; color: var(--text-tertiary);">
@@ -774,39 +804,39 @@ function renderShop() {
                 </div>
               </div>
             `;
-      }).join('')}
+        }).join('')}
         </div>
       `;
-    }
+      }
 
-    container.innerHTML = `
+      container.innerHTML = `
       <div class="animate-fade-in" style="padding: 1rem;">
         ${headerHtml}
         <h2 class="label-caps mb-8" style="font-size: 1.5rem; color: var(--text-primary); border-left: 4px solid var(--accent-orange); padding-left: 1rem;">${title}</h2>
         ${contentHtml}
       </div>
     `;
+    }
+
+    if (window.lucide) lucide.createIcons();
   }
 
-  if (window.lucide) lucide.createIcons();
-}
+  function renderStudentDashboard() {
+    const studentView = document.getElementById('student-view');
+    if (!studentView) return;
 
-function renderStudentDashboard() {
-  const studentView = document.getElementById('student-view');
-  if (!studentView) return;
+    if (typeof calculateTotalStudentScore === 'function') {
+      state.studentProfile.score = calculateTotalStudentScore();
+    }
+    const p = state.studentProfile;
 
-  // Recalculate score from all lessons
-  if (typeof calculateTotalStudentScore === 'function') {
-    state.studentProfile.score = calculateTotalStudentScore();
-    saveState();
-  }
-  const p = state.studentProfile;
-  const hasShop = (typeof SHOP_CATALOG !== 'undefined');
-  const activeAvatar = (p.activeIcon && hasShop) ? SHOP_CATALOG.avatars.find(a => a.icon === p.activeIcon) : null;
-  const activeBg = activeAvatar ? activeAvatar.bgColor : 'var(--primary-gradient)';
-  const activeTitleItem = (p.activeTitle && hasShop) ? SHOP_CATALOG.titles.find(t => t.name === p.activeTitle) : null;
 
-  studentView.innerHTML = `
+    const hasShop = (typeof SHOP_CATALOG !== 'undefined');
+    const activeAvatar = (p.activeIcon && hasShop) ? SHOP_CATALOG.avatars.find(a => a.icon === p.activeIcon) : null;
+    const activeBg = activeAvatar ? activeAvatar.bgColor : 'var(--primary-gradient)';
+    const activeTitleItem = (p.activeTitle && hasShop) ? SHOP_CATALOG.titles.find(t => t.name === p.activeTitle) : null;
+
+    studentView.innerHTML = `
       <div class="dashboard-container">
         <!-- Sidebar -->
         <aside class="sidebar-panel glass-panel animate-slide-in">
@@ -919,25 +949,25 @@ function renderStudentDashboard() {
       </div>
     </div>
   `;
-  lucide.createIcons();
-}
+    lucide.createIcons();
+  }
 
 
-// Redundant lesson logic removed. Logic migrated to js/student.js and js/lessons_data.js.
+  // Redundant lesson logic removed. Logic migrated to js/student.js and js/lessons_data.js.
 
 
 
 
 
-// Redundant lesson/quiz functions removed. Logic migrated to student.js.
-function updateTeacherSidebar() {
-  if (state.user === 'teacher') window.renderTeacherDashboard();
-}
+  // Redundant lesson/quiz functions removed. Logic migrated to student.js.
+  function updateTeacherSidebar() {
+    if (state.user === 'teacher') window.renderTeacherDashboard();
+  }
 
-function showStudentAchievements() {
-  const content = document.getElementById('student-content');
-  if (!content) return;
-  content.innerHTML = `
+  function showStudentAchievements() {
+    const content = document.getElementById('student-content');
+    if (!content) return;
+    content.innerHTML = `
     <div class="animate-fade-in">
       <button class="btn-secondary v-center" style="margin-bottom: 2rem; gap: 0.5rem;" onclick="renderStudentDashboard()">
         <i data-lucide="arrow-left" size="18"></i>
@@ -962,41 +992,42 @@ function showStudentAchievements() {
       </div>
     </div>
   `;
-  lucide.createIcons();
-}
-
-function saveStudentProfile() {
-  state.studentProfile.name = document.getElementById('edit-student-name').value;
-  state.studentProfile.school = document.getElementById('edit-student-school').value;
-  state.studentProfile.grade = document.getElementById('edit-student-grade').value;
-
-  if (state.tempStudentAvatar) {
-    state.studentProfile.avatar = state.tempStudentAvatar;
-    delete state.tempStudentAvatar;
+    lucide.createIcons();
   }
 
-  if (state.allStudents) {
-    const studentIndex = state.allStudents.findIndex(s => s.id === state.studentProfile.id);
-    if (studentIndex !== -1) {
-      state.allStudents[studentIndex].name = state.studentProfile.name;
-      state.allStudents[studentIndex].grade = state.studentProfile.grade;
-      state.allStudents[studentIndex].school = state.studentProfile.school;
-      state.allStudents[studentIndex].avatar = state.studentProfile.avatar;
+  function saveStudentProfile() {
+    state.studentProfile.name = document.getElementById('edit-student-name').value;
+    state.studentProfile.school = document.getElementById('edit-student-school').value;
+    state.studentProfile.grade = document.getElementById('edit-student-grade').value;
+
+    if (state.tempStudentAvatar) {
+      state.studentProfile.avatar = state.tempStudentAvatar;
+      delete state.tempStudentAvatar;
     }
+
+    if (state.allStudents) {
+      const studentIndex = state.allStudents.findIndex(s => s.id === state.studentProfile.id);
+      if (studentIndex !== -1) {
+        state.allStudents[studentIndex].name = state.studentProfile.name;
+        state.allStudents[studentIndex].grade = state.studentProfile.grade;
+        state.allStudents[studentIndex].school = state.studentProfile.school;
+        state.allStudents[studentIndex].avatar = state.studentProfile.avatar;
+      }
+    }
+
+    saveState();
+    syncProfileWithSheets();
+    renderStudentDashboard();
+    if (window.speakText) window.speakText('Профиль мәліметтері сәтті сақталды.');
   }
 
-  saveState();
-  renderStudentDashboard();
-  if (window.speakText) window.speakText('Профиль мәліметтері сәтті сақталды.');
-}
+  function showMyTeacherInfo() {
+    const content = document.getElementById('student-content');
+    if (!content) return;
 
-function showMyTeacherInfo() {
-  const content = document.getElementById('student-content');
-  if (!content) return;
+    const tp = state.teacherProfile;
 
-  const tp = state.teacherProfile;
-
-  content.innerHTML = `
+    content.innerHTML = `
     <div class="animate-fade-in" style="max-width: 800px; margin: 0 auto;">
       <button class="btn-secondary v-center" style="margin-bottom: 2rem; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 50px;" onclick="renderStudentDashboard()">
         <i data-lucide="arrow-left" size="18"></i> Артқа
@@ -1029,19 +1060,19 @@ function showMyTeacherInfo() {
       </div>
     </div>
   `;
-  lucide.createIcons();
-}
+    lucide.createIcons();
+  }
 
-function showStudentProfile(editMode = false) {
-  const content = document.getElementById('student-content');
-  if (!content) return;
+  function showStudentProfile(editMode = false) {
+    const content = document.getElementById('student-content');
+    if (!content) return;
 
-  const p = state.studentProfile;
-  const gradeOptions = ['7 А', '7 B', '8 А', '8 B', '9 А', '9 B'];
-  const gradeOptionsHtml = gradeOptions.map(g => `<option value="${g}" ${p.grade === g ? 'selected' : ''}>${g}</option>`).join('');
+    const p = state.studentProfile;
+    const gradeOptions = ['7 А', '7 B', '8 А', '8 B', '9 А', '9 B'];
+    const gradeOptionsHtml = gradeOptions.map(g => `<option value="${g}" ${p.grade === g ? 'selected' : ''}>${g}</option>`).join('');
 
-  if (editMode) {
-    content.innerHTML = `
+    if (editMode) {
+      content.innerHTML = `
       <div class="animate-fade-in" style="max-width: 600px; margin: 0 auto;">
           <h2 class="gradient-text mb-6" style="font-size: 2rem;">Профильді өңдеу</h2>
           <div class="glass-card" style="padding: 2rem;">
@@ -1078,21 +1109,21 @@ function showStudentProfile(editMode = false) {
     </div>
     `;
 
-    document.getElementById('edit-student-avatar').onchange = (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          state.tempStudentAvatar = ev.target.result;
-          const container = document.getElementById('student-avatar-preview-container');
-          container.innerHTML = `<img src="${ev.target.result}" style="width: 100%; height: 100%; object-fit: cover;">`;
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-    lucide.createIcons();
-  } else {
-    content.innerHTML = `
+      document.getElementById('edit-student-avatar').onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            state.tempStudentAvatar = ev.target.result;
+            const container = document.getElementById('student-avatar-preview-container');
+            container.innerHTML = `<img src="${ev.target.result}" style="width: 100%; height: 100%; object-fit: cover;">`;
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      lucide.createIcons();
+    } else {
+      content.innerHTML = `
       <div class="animate-fade-in" style="max-width: 600px; margin: 0 auto;">
         <div class="glass-card" style="padding: 3rem; text-align: center;">
           <div style="width: 150px; height: 150px; border-radius: 50%; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; border: 5px solid white; box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin: 0 auto 2rem; overflow: hidden;">
@@ -1109,23 +1140,23 @@ function showStudentProfile(editMode = false) {
         </div>
       </div>
     `;
-    lucide.createIcons();
+      lucide.createIcons();
+    }
   }
-}
 
-let freeFallLabState = {
-  h: 50,
-  isSolved: false,
-  feedback: ''
-};
+  let freeFallLabState = {
+    h: 50,
+    isSolved: false,
+    feedback: ''
+  };
 
-function renderFreeFallLab() {
-  setTimeout(() => {
-    updateFreeFallSim(freeFallLabState.h);
-    if (window.lucide) lucide.createIcons();
-  }, 100);
+  function renderFreeFallLab() {
+    setTimeout(() => {
+      updateFreeFallSim(freeFallLabState.h);
+      if (window.lucide) lucide.createIcons();
+    }, 100);
 
-  return `
+    return `
     <div class="animate-scale-in" style="padding: 1rem;">
       <!-- Lab Report Header -->
       <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #f0f9ff; padding: 2rem; border-radius: 28px; border: 1.5px solid #bae6fd;">
@@ -1215,36 +1246,36 @@ function renderFreeFallLab() {
       </div>
     </div>
   `;
-}
+  }
 
-function updateFreeFallSim(h) {
-  freeFallLabState.h = h;
-  freeFallLabState.isSolved = false;
-  freeFallLabState.feedback = '';
+  function updateFreeFallSim(h) {
+    freeFallLabState.h = h;
+    freeFallLabState.isSolved = false;
+    freeFallLabState.feedback = '';
 
-  const stage = document.getElementById('ff-sim-stage');
-  const hLabel = document.getElementById('ff-calc-h');
-  const feed = document.getElementById('ff-feedback');
-  const input = document.getElementById('ff-calc-v');
-  const btn = document.querySelector('[onclick="checkFreeFallCalculation()"]');
+    const stage = document.getElementById('ff-sim-stage');
+    const hLabel = document.getElementById('ff-calc-h');
+    const feed = document.getElementById('ff-feedback');
+    const input = document.getElementById('ff-calc-v');
+    const btn = document.querySelector('[onclick="checkFreeFallCalculation()"]');
 
-  if (hLabel) hLabel.innerText = `${h} м`;
-  if (feed) feed.innerHTML = '';
-  if (input) { input.value = ''; input.disabled = false; }
-  if (btn) { btn.disabled = false; btn.innerText = 'ТЕКСЕРУ'; }
+    if (hLabel) hLabel.innerText = `${h} м`;
+    if (feed) feed.innerHTML = '';
+    if (input) { input.value = ''; input.disabled = false; }
+    if (btn) { btn.disabled = false; btn.innerText = 'ТЕКСЕРУ'; }
 
-  const btns = document.querySelectorAll('.lab-btn');
-  btns.forEach(b => {
-    if (b.innerText.includes(h + 'м')) b.classList.add('active');
-    else b.classList.remove('active');
-  });
+    const btns = document.querySelectorAll('.lab-btn');
+    btns.forEach(b => {
+      if (b.innerText.includes(h + 'м')) b.classList.add('active');
+      else b.classList.remove('active');
+    });
 
-  // Calculate dynamic positions
-  const markerY = 550 - (h * 5); // Base Y for the selected height
-  const holderY = markerY - 15;   // Holder sits slightly above the mark
-  const ballCy = holderY + 35;   // Ball sits centered below the holder
+    // Calculate dynamic positions
+    const markerY = 550 - (h * 5); // Base Y for the selected height
+    const holderY = markerY - 15;   // Holder sits slightly above the mark
+    const ballCy = holderY + 35;   // Ball sits centered below the holder
 
-  stage.innerHTML = `
+    stage.innerHTML = `
     <svg class="lab-svg" width="100%" height="100%" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet">
       <defs>
         <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -1263,97 +1294,97 @@ function updateFreeFallSim(h) {
       <text x="200" y="${holderY - 15}" text-anchor="middle" font-size="18" font-weight="900" fill="var(--accent-orange)">Биіктік: ${h}м</text>
     </svg>
   `;
-}
-
-function checkFreeFallCalculation() {
-  const input = document.getElementById('ff-calc-v');
-  const feed = document.getElementById('ff-feedback');
-  const btn = document.querySelector('[onclick="checkFreeFallCalculation()"]');
-  if (!input || !feed) return;
-
-  const correct = Math.sqrt(2 * 10 * freeFallLabState.h).toFixed(1);
-  const user = parseFloat(input.value).toFixed(1);
-
-  if (Math.abs(correct - user) < 0.2) {
-    freeFallLabState.isSolved = true;
-    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Келесіге өтсеңіз болады.</div>';
-    input.disabled = true;
-    btn.disabled = true;
-    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
-    if (window.triggerSalute) triggerSalute();
-  } else {
-    feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. v = √2gh формуласын қолдан.</div>';
   }
-}
 
-function startFreeFallAnim() {
-  const ball = document.getElementById('ff-ball');
-  const btn = document.getElementById('ff-start-btn');
-  if (!ball || !btn || btn.disabled) return;
+  function checkFreeFallCalculation() {
+    const input = document.getElementById('ff-calc-v');
+    const feed = document.getElementById('ff-feedback');
+    const btn = document.querySelector('[onclick="checkFreeFallCalculation()"]');
+    if (!input || !feed) return;
 
-  btn.disabled = true;
-  const h = freeFallLabState.h;
-  const tFinal = Math.sqrt(2 * h / 10);
-  const startTIme = performance.now();
-  const startY = parseFloat(ball.getAttribute('cy'));
+    const correct = Math.sqrt(2 * 10 * freeFallLabState.h).toFixed(1);
+    const user = parseFloat(input.value).toFixed(1);
 
-  function step(now) {
-    const dt = (now - startTIme) / 1000;
-    if (dt < tFinal) {
-      const cy = startY + (0.5 * 10 * dt * dt * 5);
-      ball.setAttribute('cy', cy);
-      document.getElementById('ff-res-t').innerText = dt.toFixed(2) + " с";
-      document.getElementById('ff-res-v').innerText = (10 * dt).toFixed(1) + " м/с";
-      requestAnimationFrame(step);
+    if (Math.abs(correct - user) < 0.2) {
+      freeFallLabState.isSolved = true;
+      feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Келесіге өтсеңіз болады.</div>';
+      input.disabled = true;
+      btn.disabled = true;
+      if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+      if (window.triggerSalute) triggerSalute();
     } else {
-      ball.setAttribute('cy', startY + (h * 5));
-      document.getElementById('ff-res-t').innerText = tFinal.toFixed(2) + " с";
-      document.getElementById('ff-res-v').innerText = (10 * tFinal).toFixed(1) + " м/с";
-      setTimeout(() => {
-        btn.disabled = false;
-        ball.setAttribute('cy', startY);
-      }, 2000);
+      feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. v = √2gh формуласын қолдан.</div>';
     }
   }
-  requestAnimationFrame(step);
-}
 
-const impulseLabState = {
-  m1: 2,
-  v1: 5,
-  m2: 4,
-  type: 'elastic',
-  isSolved: false,
-  feedback: ''
-};
+  function startFreeFallAnim() {
+    const ball = document.getElementById('ff-ball');
+    const btn = document.getElementById('ff-start-btn');
+    if (!ball || !btn || btn.disabled) return;
 
-function checkImpulseCalculation() {
-  const input = document.getElementById('imp-calc-p');
-  const feed = document.getElementById('imp-feedback');
-  if (!input || !feed) return;
+    btn.disabled = true;
+    const h = freeFallLabState.h;
+    const tFinal = Math.sqrt(2 * h / 10);
+    const startTIme = performance.now();
+    const startY = parseFloat(ball.getAttribute('cy'));
 
-  const m1 = parseFloat(document.getElementById('m1-range').value);
-  const v1 = parseFloat(document.getElementById('v1-range').value);
-  const correct = m1 * v1;
-  const user = parseFloat(input.value);
-
-  if (Math.abs(correct - user) < 0.1) {
-    impulseLabState.isSolved = true;
-    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Импульс дұрыс есептелді.</div>';
-    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
-    if (window.triggerSalute) triggerSalute();
-  } else {
-    feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. p = m · v формуласын қолдан.</div>';
+    function step(now) {
+      const dt = (now - startTIme) / 1000;
+      if (dt < tFinal) {
+        const cy = startY + (0.5 * 10 * dt * dt * 5);
+        ball.setAttribute('cy', cy);
+        document.getElementById('ff-res-t').innerText = dt.toFixed(2) + " с";
+        document.getElementById('ff-res-v').innerText = (10 * dt).toFixed(1) + " м/с";
+        requestAnimationFrame(step);
+      } else {
+        ball.setAttribute('cy', startY + (h * 5));
+        document.getElementById('ff-res-t').innerText = tFinal.toFixed(2) + " с";
+        document.getElementById('ff-res-v').innerText = (10 * tFinal).toFixed(1) + " м/с";
+        setTimeout(() => {
+          btn.disabled = false;
+          ball.setAttribute('cy', startY);
+        }, 2000);
+      }
+    }
+    requestAnimationFrame(step);
   }
-}
 
-function renderImpulseLab() {
-  setTimeout(() => {
-    updateImpulseSim();
-    if (window.lucide) lucide.createIcons();
-  }, 100);
+  const impulseLabState = {
+    m1: 2,
+    v1: 5,
+    m2: 4,
+    type: 'elastic',
+    isSolved: false,
+    feedback: ''
+  };
 
-  return `
+  function checkImpulseCalculation() {
+    const input = document.getElementById('imp-calc-p');
+    const feed = document.getElementById('imp-feedback');
+    if (!input || !feed) return;
+
+    const m1 = parseFloat(document.getElementById('m1-range').value);
+    const v1 = parseFloat(document.getElementById('v1-range').value);
+    const correct = m1 * v1;
+    const user = parseFloat(input.value);
+
+    if (Math.abs(correct - user) < 0.1) {
+      impulseLabState.isSolved = true;
+      feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Импульс дұрыс есептелді.</div>';
+      if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+      if (window.triggerSalute) triggerSalute();
+    } else {
+      feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. p = m · v формуласын қолдан.</div>';
+    }
+  }
+
+  function renderImpulseLab() {
+    setTimeout(() => {
+      updateImpulseSim();
+      if (window.lucide) lucide.createIcons();
+    }, 100);
+
+    return `
     <div class="animate-scale-in" style="padding: 1rem;">
       <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #fdf2f8; padding: 2rem; border-radius: 28px; border: 1.5px solid #fce7f3;">
         <div>
@@ -1428,34 +1459,34 @@ function renderImpulseLab() {
       </div>
     </div>
   `;
-}
+  }
 
-function updateImpulseSim() {
-  const stage = document.getElementById('impulse-sim-stage');
-  const m1 = parseFloat(document.getElementById('m1-range').value);
-  const v1 = parseFloat(document.getElementById('v1-range').value);
-  const m2 = parseFloat(document.getElementById('m2-range').value);
-  const type = document.getElementById('collision-type').value;
+  function updateImpulseSim() {
+    const stage = document.getElementById('impulse-sim-stage');
+    const m1 = parseFloat(document.getElementById('m1-range').value);
+    const v1 = parseFloat(document.getElementById('v1-range').value);
+    const m2 = parseFloat(document.getElementById('m2-range').value);
+    const type = document.getElementById('collision-type').value;
 
-  document.getElementById('m1-val').innerText = m1 + "кг";
-  document.getElementById('v1-val').innerText = v1 + "м/с";
-  document.getElementById('m2-val').innerText = m2 + "кг";
+    document.getElementById('m1-val').innerText = m1 + "кг";
+    document.getElementById('v1-val').innerText = v1 + "м/с";
+    document.getElementById('m2-val').innerText = m2 + "кг";
 
-  const p1 = m1 * v1;
-  const p2 = 0; // v2 is 0
-  const pTotal = p1 + p2;
+    const p1 = m1 * v1;
+    const p2 = 0; // v2 is 0
+    const pTotal = p1 + p2;
 
-  const pInitial = document.getElementById('p-initial-val');
-  const pFinal = document.getElementById('p-final-val');
-  if (pInitial) pInitial.innerText = pTotal.toFixed(1);
-  if (pFinal) pFinal.innerText = pTotal.toFixed(1);
+    const pInitial = document.getElementById('p-initial-val');
+    const pFinal = document.getElementById('p-final-val');
+    if (pInitial) pInitial.innerText = pTotal.toFixed(1);
+    if (pFinal) pFinal.innerText = pTotal.toFixed(1);
 
-  if (!stage) return;
+    if (!stage) return;
 
-  const r1 = 15 + (m1 * 3);
-  const r2 = 15 + (m2 * 3);
+    const r1 = 15 + (m1 * 3);
+    const r2 = 15 + (m2 * 3);
 
-  stage.innerHTML = `
+    stage.innerHTML = `
     <svg class="lab-svg" id="imp-svg" width="100%" height="100%" viewBox="0 0 600 350">
 
       <defs>
@@ -1485,94 +1516,94 @@ function updateImpulseSim() {
       </marker>
     </svg>
   `;
-}
+  }
 
-window.startImpulseAnim = function () {
-  const btn = document.getElementById('start-imp-btn');
-  const m1 = parseFloat(document.getElementById('m1-range').value);
-  const v1 = parseFloat(document.getElementById('v1-range').value);
-  const m2 = parseFloat(document.getElementById('m2-range').value);
-  const type = document.getElementById('collision-type').value;
+  window.startImpulseAnim = function () {
+    const btn = document.getElementById('start-imp-btn');
+    const m1 = parseFloat(document.getElementById('m1-range').value);
+    const v1 = parseFloat(document.getElementById('v1-range').value);
+    const m2 = parseFloat(document.getElementById('m2-range').value);
+    const type = document.getElementById('collision-type').value;
 
-  if (v1 <= 0 || !btn) return;
+    if (v1 <= 0 || !btn) return;
 
-  // Disable Controls
-  btn.disabled = true;
-  document.getElementById('m1-range').disabled = true;
-  document.getElementById('v1-range').disabled = true;
-  document.getElementById('m2-range').disabled = true;
-  document.getElementById('collision-type').disabled = true;
+    // Disable Controls
+    btn.disabled = true;
+    document.getElementById('m1-range').disabled = true;
+    document.getElementById('v1-range').disabled = true;
+    document.getElementById('m2-range').disabled = true;
+    document.getElementById('collision-type').disabled = true;
 
-  const b1 = document.getElementById('ball1');
-  const b2 = document.getElementById('ball2');
-  const vVec = document.getElementById('v1-vector');
-  const r1 = parseFloat(b1.getAttribute('r'));
-  const r2 = parseFloat(b2.getAttribute('r'));
+    const b1 = document.getElementById('ball1');
+    const b2 = document.getElementById('ball2');
+    const vVec = document.getElementById('v1-vector');
+    const r1 = parseFloat(b1.getAttribute('r'));
+    const r2 = parseFloat(b2.getAttribute('r'));
 
-  let cx1 = 80;
-  let cx2 = 350;
-  let curV1 = v1 * 1.5; // Scale for animation speed
-  let curV2 = 0;
-  let collided = false;
+    let cx1 = 80;
+    let cx2 = 350;
+    let curV1 = v1 * 1.5; // Scale for animation speed
+    let curV2 = 0;
+    let collided = false;
 
-  function step() {
-    cx1 += curV1;
-    cx2 += curV2;
+    function step() {
+      cx1 += curV1;
+      cx2 += curV2;
 
-    b1.setAttribute('cx', cx1);
-    b2.setAttribute('cx', cx2);
-    if (vVec) vVec.setAttribute('display', 'none');
+      b1.setAttribute('cx', cx1);
+      b2.setAttribute('cx', cx2);
+      if (vVec) vVec.setAttribute('display', 'none');
 
-    // Collision Check
-    if (!collided && (cx1 + r1 >= cx2 - r2)) {
-      collided = true;
-      cx1 = cx2 - r2 - r1; // Align exactly at impact
+      // Collision Check
+      if (!collided && (cx1 + r1 >= cx2 - r2)) {
+        collided = true;
+        cx1 = cx2 - r2 - r1; // Align exactly at impact
 
-      if (type === 'elastic') {
-        const v1_final = ((m1 - m2) * v1) / (m1 + m2);
-        const v2_final = (2 * m1 * v1) / (m1 + m2);
-        curV1 = v1_final * 1.5;
-        curV2 = v2_final * 1.5;
-      } else {
-        const v_final = (m1 * v1) / (m1 + m2);
-        curV1 = v_final * 1.5;
-        curV2 = v_final * 1.5;
+        if (type === 'elastic') {
+          const v1_final = ((m1 - m2) * v1) / (m1 + m2);
+          const v2_final = (2 * m1 * v1) / (m1 + m2);
+          curV1 = v1_final * 1.5;
+          curV2 = v2_final * 1.5;
+        } else {
+          const v_final = (m1 * v1) / (m1 + m2);
+          curV1 = v_final * 1.5;
+          curV2 = v_final * 1.5;
+        }
       }
-    }
 
-    // Stop condition
-    if (cx1 > 650 || cx1 < -50 || cx2 > 650) {
-      btn.disabled = false;
-      document.getElementById('m1-range').disabled = false;
-      document.getElementById('v1-range').disabled = false;
-      document.getElementById('m2-range').disabled = false;
-      document.getElementById('collision-type').disabled = false;
-      updateImpulseSim(); // Reset to initial state after animation
-      return;
+      // Stop condition
+      if (cx1 > 650 || cx1 < -50 || cx2 > 650) {
+        btn.disabled = false;
+        document.getElementById('m1-range').disabled = false;
+        document.getElementById('v1-range').disabled = false;
+        document.getElementById('m2-range').disabled = false;
+        document.getElementById('collision-type').disabled = false;
+        updateImpulseSim(); // Reset to initial state after animation
+        return;
+      }
+
+      requestAnimationFrame(step);
     }
 
     requestAnimationFrame(step);
-  }
-
-  requestAnimationFrame(step);
-};
+  };
 
 
-// Newton 3 Lab State
-let newton3LabState = {
-  f: 20,
-  isSolved: false,
-  feedback: '',
-  isMoving: false
-};
+  // Newton 3 Lab State
+  let newton3LabState = {
+    f: 20,
+    isSolved: false,
+    feedback: '',
+    isMoving: false
+  };
 
-function renderNewton3Lab() {
-  setTimeout(() => {
-    updateNewton3Sim();
-    if (window.lucide) lucide.createIcons();
-  }, 100);
+  function renderNewton3Lab() {
+    setTimeout(() => {
+      updateNewton3Sim();
+      if (window.lucide) lucide.createIcons();
+    }, 100);
 
-  return `
+    return `
     <div class="animate-scale-in" style="padding: 1rem;">
       <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #fff1f2; padding: 2rem; border-radius: 28px; border: 1.5px solid #fecdd3;">
         <div>
@@ -1629,19 +1660,19 @@ function renderNewton3Lab() {
       </div>
     </div>
   `;
-}
+  }
 
-function updateNewton3Value() {
-  newton3LabState.f = parseFloat(document.getElementById('n3-f-range').value);
-  document.getElementById('n3-f-val').innerText = newton3LabState.f + " Н";
-  updateNewton3Sim();
-}
+  function updateNewton3Value() {
+    newton3LabState.f = parseFloat(document.getElementById('n3-f-range').value);
+    document.getElementById('n3-f-val').innerText = newton3LabState.f + " Н";
+    updateNewton3Sim();
+  }
 
-function updateNewton3Sim() {
-  const stage = document.getElementById('newton3-sim-stage');
-  if (!stage) return;
+  function updateNewton3Sim() {
+    const stage = document.getElementById('newton3-sim-stage');
+    if (!stage) return;
 
-  stage.innerHTML = `
+    stage.innerHTML = `
     <svg width="100%" height="100%" viewBox="0 0 800 350">
       <line x1="100" y1="220" x2="700" y2="220" stroke="#94a3b8" stroke-width="2" />
       <g id="n3-s1" transform="translate(340, 160)">
@@ -1662,71 +1693,71 @@ function updateNewton3Sim() {
       </g>
     </svg>
   `;
-}
-
-function checkNewton3Calculation() {
-  const input = document.getElementById('n3-calc-f');
-  const feed = document.getElementById('n3-feedback');
-  if (!input || !feed) return;
-
-  const correct = newton3LabState.f;
-  const user = Math.abs(parseFloat(input.value));
-
-  if (correct === user) {
-    newton3LabState.isSolved = true;
-    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Әрекет қарсы әрекетке тең.</div>';
-    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
-    if (window.triggerSalute) triggerSalute();
-  } else {
-    feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. Күштердің модулі тең болуы керек.</div>';
   }
-}
 
-function startNewton3Anim() {
-  const s1 = document.getElementById('n3-s1');
-  const s2 = document.getElementById('n3-s2');
-  const btn = document.getElementById('n3-start-btn');
-  if (!s1 || !s2 || !btn || btn.disabled) return;
+  function checkNewton3Calculation() {
+    const input = document.getElementById('n3-calc-f');
+    const feed = document.getElementById('n3-feedback');
+    if (!input || !feed) return;
 
-  btn.disabled = true;
-  let x1 = 340, x2 = 400;
-  let v1 = 0, v2 = 0;
-  const a = newton3LabState.f / 10;
+    const correct = newton3LabState.f;
+    const user = Math.abs(parseFloat(input.value));
 
-  function step() {
-    v1 -= a * 0.016;
-    v2 += a * 0.016;
-    x1 += v1;
-    x2 += v2;
-    if (x1 < 50 || x2 > 700) {
-      btn.disabled = false;
-      setTimeout(() => {
-        s1.setAttribute('transform', 'translate(340, 160)');
-        s2.setAttribute('transform', 'translate(400, 160)');
-      }, 2000);
-      return;
+    if (correct === user) {
+      newton3LabState.isSolved = true;
+      feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Әрекет қарсы әрекетке тең.</div>';
+      if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+      if (window.triggerSalute) triggerSalute();
+    } else {
+      feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. Күштердің модулі тең болуы керек.</div>';
     }
-    s1.setAttribute('transform', `translate(${x1}, 160)`);
-    s2.setAttribute('transform', `translate(${x2}, 160)`);
+  }
+
+  function startNewton3Anim() {
+    const s1 = document.getElementById('n3-s1');
+    const s2 = document.getElementById('n3-s2');
+    const btn = document.getElementById('n3-start-btn');
+    if (!s1 || !s2 || !btn || btn.disabled) return;
+
+    btn.disabled = true;
+    let x1 = 340, x2 = 400;
+    let v1 = 0, v2 = 0;
+    const a = newton3LabState.f / 10;
+
+    function step() {
+      v1 -= a * 0.016;
+      v2 += a * 0.016;
+      x1 += v1;
+      x2 += v2;
+      if (x1 < 50 || x2 > 700) {
+        btn.disabled = false;
+        setTimeout(() => {
+          s1.setAttribute('transform', 'translate(340, 160)');
+          s2.setAttribute('transform', 'translate(400, 160)');
+        }, 2000);
+        return;
+      }
+      s1.setAttribute('transform', `translate(${x1}, 160)`);
+      s2.setAttribute('transform', `translate(${x2}, 160)`);
+      requestAnimationFrame(step);
+    }
     requestAnimationFrame(step);
   }
-  requestAnimationFrame(step);
-}
 
-// Gravity Lab State
-let gravityLabState = {
-  m1: 100,
-  m2: 100,
-  dist: 200
-};
+  // Gravity Lab State
+  let gravityLabState = {
+    m1: 100,
+    m2: 100,
+    dist: 200
+  };
 
-function renderGravityLab() {
-  setTimeout(() => {
-    updateGravitySim();
-    if (window.lucide) lucide.createIcons();
-  }, 100);
+  function renderGravityLab() {
+    setTimeout(() => {
+      updateGravitySim();
+      if (window.lucide) lucide.createIcons();
+    }, 100);
 
-  return `
+    return `
     <div class="animate-scale-in" style="padding: 1rem;">
       <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #faf5ff; padding: 2rem; border-radius: 28px; border: 1.5px solid #f3e8ff;">
         <div>
@@ -1790,30 +1821,30 @@ function renderGravityLab() {
       </div>
     </div>
   `;
-}
+  }
 
-function updateGravityValue() {
-  gravityLabState.m1 = parseFloat(document.getElementById('grav-m1-range').value);
-  gravityLabState.m2 = parseFloat(document.getElementById('grav-m2-range').value);
-  gravityLabState.dist = parseFloat(document.getElementById('grav-dist-range').value);
+  function updateGravityValue() {
+    gravityLabState.m1 = parseFloat(document.getElementById('grav-m1-range').value);
+    gravityLabState.m2 = parseFloat(document.getElementById('grav-m2-range').value);
+    gravityLabState.dist = parseFloat(document.getElementById('grav-dist-range').value);
 
-  document.getElementById('grav-m1-v').innerText = gravityLabState.m1 + " кг";
-  document.getElementById('grav-m2-v').innerText = gravityLabState.m2 + " кг";
-  document.getElementById('grav-dist-v').innerText = gravityLabState.dist + " м";
-  updateGravitySim();
-}
+    document.getElementById('grav-m1-v').innerText = gravityLabState.m1 + " кг";
+    document.getElementById('grav-m2-v').innerText = gravityLabState.m2 + " кг";
+    document.getElementById('grav-dist-v').innerText = gravityLabState.dist + " м";
+    updateGravitySim();
+  }
 
-function updateGravitySim() {
-  const stage = document.getElementById('gravity-sim-stage');
-  if (!stage) return;
+  function updateGravitySim() {
+    const stage = document.getElementById('gravity-sim-stage');
+    if (!stage) return;
 
-  const r1 = Math.sqrt(gravityLabState.m1) * 2;
-  const r2 = Math.sqrt(gravityLabState.m2) * 2;
-  const cx = 400;
-  const cy = 190;
-  const offset = gravityLabState.dist / 2;
+    const r1 = Math.sqrt(gravityLabState.m1) * 2;
+    const r2 = Math.sqrt(gravityLabState.m2) * 2;
+    const cx = 400;
+    const cy = 190;
+    const offset = gravityLabState.dist / 2;
 
-  stage.innerHTML = `
+    stage.innerHTML = `
     <svg width="100%" height="100%" viewBox="0 0 800 380">
       <defs>
         <radialGradient id="gradPlanet1">
@@ -1831,43 +1862,43 @@ function updateGravitySim() {
       <text x="${cx}" y="${cy + 70}" text-anchor="middle" fill="#a78bfa" font-weight="800">r = ${gravityLabState.dist} м</text>
     </svg>
   `;
-}
-
-function checkGravityCalculation() {
-  const input = document.getElementById('grav-calc-f');
-  const feed = document.getElementById('grav-feedback');
-  if (!input || !feed) return;
-
-  const correct = (gravityLabState.m1 * gravityLabState.m2) / Math.pow(gravityLabState.dist, 2);
-  const user = parseFloat(input.value);
-
-  if (Math.abs(correct - user) / (correct || 1) < 0.1) {
-    gravityLabState.isSolved = true;
-    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Тартылыс күші есептелді.</div>';
-    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
-    if (window.triggerSalute) triggerSalute();
-  } else {
-    feed.innerHTML = `<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. (m₁·m₂)/r² екенін ұмытпа. Жауап: ${correct.toFixed(3)}</div>`;
   }
-}
+
+  function checkGravityCalculation() {
+    const input = document.getElementById('grav-calc-f');
+    const feed = document.getElementById('grav-feedback');
+    if (!input || !feed) return;
+
+    const correct = (gravityLabState.m1 * gravityLabState.m2) / Math.pow(gravityLabState.dist, 2);
+    const user = parseFloat(input.value);
+
+    if (Math.abs(correct - user) / (correct || 1) < 0.1) {
+      gravityLabState.isSolved = true;
+      feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Тартылыс күші есептелді.</div>';
+      if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+      if (window.triggerSalute) triggerSalute();
+    } else {
+      feed.innerHTML = `<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. (m₁·m₂)/r² екенін ұмытпа. Жауап: ${correct.toFixed(3)}</div>`;
+    }
+  }
 
 
-// Density Lab State
-let densityLabState = {
-  material: 'gold',
-  mass: 193,
-  volume: 10,
-  isSolved: false,
-  feedback: ''
-};
+  // Density Lab State
+  let densityLabState = {
+    material: 'gold',
+    mass: 193,
+    volume: 10,
+    isSolved: false,
+    feedback: ''
+  };
 
-function renderDensityLab() {
-  setTimeout(() => {
-    updateDensitySim();
-    if (window.lucide) lucide.createIcons();
-  }, 100);
+  function renderDensityLab() {
+    setTimeout(() => {
+      updateDensitySim();
+      if (window.lucide) lucide.createIcons();
+    }, 100);
 
-  return `
+    return `
     <div class="animate-scale-in" style="padding: 1rem;">
       <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #eff6ff; padding: 2rem; border-radius: 28px; border: 1.5px solid #dbeafe;">
         <div>
@@ -1930,29 +1961,29 @@ function renderDensityLab() {
       </div>
     </div>
   `;
-}
+  }
 
-function updateDensityValue() {
-  const mat = document.getElementById('dens-mat-select').value;
-  const vol = parseFloat(document.getElementById('dens-vol-range').value);
-  const densities = { gold: 19.3, iron: 7.8, wood: 0.7 };
+  function updateDensityValue() {
+    const mat = document.getElementById('dens-mat-select').value;
+    const vol = parseFloat(document.getElementById('dens-vol-range').value);
+    const densities = { gold: 19.3, iron: 7.8, wood: 0.7 };
 
-  densityLabState.material = mat;
-  densityLabState.volume = vol;
-  densityLabState.mass = (densities[mat] * vol).toFixed(1);
+    densityLabState.material = mat;
+    densityLabState.volume = vol;
+    densityLabState.mass = (densities[mat] * vol).toFixed(1);
 
-  document.getElementById('dens-vol-v').innerText = vol + " см³";
-  document.getElementById('dens-mass-display').innerText = `m = ${densityLabState.mass} г`;
-  updateDensitySim();
-}
+    document.getElementById('dens-vol-v').innerText = vol + " см³";
+    document.getElementById('dens-mass-display').innerText = `m = ${densityLabState.mass} г`;
+    updateDensitySim();
+  }
 
-function updateDensitySim() {
-  const stage = document.getElementById('density-sim-stage');
-  if (!stage) return;
-  const color = densityLabState.material === 'gold' ? '#facc15' : densityLabState.material === 'iron' ? '#94a3b8' : '#b45309';
-  const size = Math.pow(densityLabState.volume, 1 / 3) * 25;
+  function updateDensitySim() {
+    const stage = document.getElementById('density-sim-stage');
+    if (!stage) return;
+    const color = densityLabState.material === 'gold' ? '#facc15' : densityLabState.material === 'iron' ? '#94a3b8' : '#b45309';
+    const size = Math.pow(densityLabState.volume, 1 / 3) * 25;
 
-  stage.innerHTML = `
+    stage.innerHTML = `
     <svg width="100%" height="100%" viewBox="0 0 800 350">
       <rect x="300" y="100" width="200" height="200" fill="#bae6fd" opacity="0.6" stroke="#0ea5e9" stroke-width="2" />
       <path d="M 500 120 L 530 120 L 530 250" fill="none" stroke="#0ea5e9" stroke-width="8" stroke-linecap="round" />
@@ -1961,43 +1992,43 @@ function updateDensitySim() {
       <text x="400" y="${300 - size - 10}" text-anchor="middle" font-size="12" font-weight="900" fill="${color}">${densityLabState.material.toUpperCase()}</text>
     </svg>
   `;
-}
-
-function checkDensityCalculation() {
-  const input = document.getElementById('dens-calc-rho');
-  const feed = document.getElementById('dens-feedback');
-  if (!input || !feed) return;
-
-  const densities = { gold: 19.3, iron: 7.8, wood: 0.7 };
-  const correct = densities[densityLabState.material];
-  const user = parseFloat(input.value);
-
-  if (Math.abs(correct - user) < 0.1) {
-    densityLabState.isSolved = true;
-    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Тығыздық анықталды.</div>';
-    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
-    if (window.triggerSalute) triggerSalute();
-  } else {
-    feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. ρ = m / V формуласын қолдан.</div>';
   }
-}
 
-// Pressure Lab State
-// Pressure Lab State
-let pressureLabState = {
-  force: 50,
-  area: 1,
-  isSolved: false,
-  feedback: ''
-};
+  function checkDensityCalculation() {
+    const input = document.getElementById('dens-calc-rho');
+    const feed = document.getElementById('dens-feedback');
+    if (!input || !feed) return;
 
-function renderPressureLab() {
-  setTimeout(() => {
-    updatePressureSim();
-    if (window.lucide) lucide.createIcons();
-  }, 100);
+    const densities = { gold: 19.3, iron: 7.8, wood: 0.7 };
+    const correct = densities[densityLabState.material];
+    const user = parseFloat(input.value);
 
-  return `
+    if (Math.abs(correct - user) < 0.1) {
+      densityLabState.isSolved = true;
+      feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Тығыздық анықталды.</div>';
+      if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+      if (window.triggerSalute) triggerSalute();
+    } else {
+      feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. ρ = m / V формуласын қолдан.</div>';
+    }
+  }
+
+  // Pressure Lab State
+  // Pressure Lab State
+  let pressureLabState = {
+    force: 50,
+    area: 1,
+    isSolved: false,
+    feedback: ''
+  };
+
+  function renderPressureLab() {
+    setTimeout(() => {
+      updatePressureSim();
+      if (window.lucide) lucide.createIcons();
+    }, 100);
+
+    return `
     <div class="animate-scale-in" style="padding: 1rem;">
       <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #fff7ed; padding: 2rem; border-radius: 28px; border: 1.5px solid #ffedd5;">
         <div>
@@ -2059,67 +2090,67 @@ function renderPressureLab() {
       </div>
     </div>
   `;
-}
+  }
 
-function updatePressureValue() {
-  pressureLabState.force = parseFloat(document.getElementById('pres-force-range').value);
-  pressureLabState.area = parseFloat(document.getElementById('pres-area-select').value);
+  function updatePressureValue() {
+    pressureLabState.force = parseFloat(document.getElementById('pres-force-range').value);
+    pressureLabState.area = parseFloat(document.getElementById('pres-area-select').value);
 
-  document.getElementById('pres-f-v').innerText = pressureLabState.force + " Н";
-  updatePressureSim();
-}
+    document.getElementById('pres-f-v').innerText = pressureLabState.force + " Н";
+    updatePressureSim();
+  }
 
-function updatePressureSim() {
-  const stage = document.getElementById('pressure-sim-stage');
-  if (!stage) return;
-  const p = pressureLabState.force / pressureLabState.area;
-  const depth = (p / 20) * 30;
-  const w = 40 * pressureLabState.area;
-  const h = 80 / pressureLabState.area;
+  function updatePressureSim() {
+    const stage = document.getElementById('pressure-sim-stage');
+    if (!stage) return;
+    const p = pressureLabState.force / pressureLabState.area;
+    const depth = (p / 20) * 30;
+    const w = 40 * pressureLabState.area;
+    const h = 80 / pressureLabState.area;
 
-  stage.innerHTML = `
+    stage.innerHTML = `
     <svg width="100%" height="100%" viewBox="0 0 800 350">
       <rect x="0" y="250" width="800" height="100" fill="#fde68a" />
       <path d="M 0 250 Q 400 ${250 + depth / 2} 800 250" fill="#fde68a" stroke="#f59e0b" stroke-width="2" />
       <rect x="${400 - w / 2}" y="${250 + depth - h}" width="${w}" height="${h}" fill="#92400e" rx="2" />
     </svg>
   `;
-}
-
-function checkPressureCalculation() {
-  const input = document.getElementById('pres-calc-p');
-  const feed = document.getElementById('pres-feedback');
-  if (!input || !feed) return;
-
-  const correct = (pressureLabState.force / pressureLabState.area).toFixed(1);
-  const user = parseFloat(input.value).toFixed(1);
-
-  if (Math.abs(correct - user) < 0.1) {
-    pressureLabState.isSolved = true;
-    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Қысым дәл есептелді.</div>';
-    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
-    if (window.triggerSalute) triggerSalute();
-  } else {
-    feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. P = F / S формуласын қолдан.</div>';
   }
-}
 
-// Archimedes Lab State
-let archiLabState = {
-  liquid: 'water',
-  vol: 100,
-  isSubmerged: false,
-  isSolved: false,
-  feedback: ''
-};
+  function checkPressureCalculation() {
+    const input = document.getElementById('pres-calc-p');
+    const feed = document.getElementById('pres-feedback');
+    if (!input || !feed) return;
 
-function renderArchimedesLab() {
-  setTimeout(() => {
-    updateArchiSim();
-    if (window.lucide) lucide.createIcons();
-  }, 100);
+    const correct = (pressureLabState.force / pressureLabState.area).toFixed(1);
+    const user = parseFloat(input.value).toFixed(1);
 
-  return `
+    if (Math.abs(correct - user) < 0.1) {
+      pressureLabState.isSolved = true;
+      feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Қысым дәл есептелді.</div>';
+      if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+      if (window.triggerSalute) triggerSalute();
+    } else {
+      feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. P = F / S формуласын қолдан.</div>';
+    }
+  }
+
+  // Archimedes Lab State
+  let archiLabState = {
+    liquid: 'water',
+    vol: 100,
+    isSubmerged: false,
+    isSolved: false,
+    feedback: ''
+  };
+
+  function renderArchimedesLab() {
+    setTimeout(() => {
+      updateArchiSim();
+      if (window.lucide) lucide.createIcons();
+    }, 100);
+
+    return `
     <div class="animate-scale-in" style="padding: 1rem;">
       <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #f0fdfa; padding: 2rem; border-radius: 28px; border: 1.5px solid #ccfbf1;">
         <div>
@@ -2183,33 +2214,33 @@ function renderArchimedesLab() {
       </div>
     </div>
   `;
-}
+  }
 
-function updateArchiValue() {
-  archiLabState.liquid = document.getElementById('archi-liq-select').value;
-  archiLabState.vol = parseFloat(document.getElementById('archi-vol-range').value);
+  function updateArchiValue() {
+    archiLabState.liquid = document.getElementById('archi-liq-select').value;
+    archiLabState.vol = parseFloat(document.getElementById('archi-vol-range').value);
 
-  const m3 = (archiLabState.vol / 1000000).toFixed(4);
-  document.getElementById('archi-vol-v').innerText = `${archiLabState.vol} см³ (${m3} м³)`;
-  updateArchiSim();
-}
+    const m3 = (archiLabState.vol / 1000000).toFixed(4);
+    document.getElementById('archi-vol-v').innerText = `${archiLabState.vol} см³ (${m3} м³)`;
+    updateArchiSim();
+  }
 
-function toggleArchiSubmerge() {
-  archiLabState.isSubmerged = !archiLabState.isSubmerged;
-  const btn = document.getElementById('archi-sub-btn');
-  if (btn) btn.innerText = archiLabState.isSubmerged ? 'ШЫҒАРУ' : 'БАТЫРУ';
-  updateArchiSim();
-}
+  function toggleArchiSubmerge() {
+    archiLabState.isSubmerged = !archiLabState.isSubmerged;
+    const btn = document.getElementById('archi-sub-btn');
+    if (btn) btn.innerText = archiLabState.isSubmerged ? 'ШЫҒАРУ' : 'БАТЫРУ';
+    updateArchiSim();
+  }
 
-function updateArchiSim() {
-  const stage = document.getElementById('archi-sim-stage');
-  if (!stage) return;
+  function updateArchiSim() {
+    const stage = document.getElementById('archi-sim-stage');
+    if (!stage) return;
 
-  const liqColor = archiLabState.liquid === 'water' ? '#bae6fd' : '#fef08a';
-  const y = archiLabState.isSubmerged ? 180 : 100;
-  const size = 60 + (archiLabState.vol / 10);
+    const liqColor = archiLabState.liquid === 'water' ? '#bae6fd' : '#fef08a';
+    const y = archiLabState.isSubmerged ? 180 : 100;
+    const size = 60 + (archiLabState.vol / 10);
 
-  stage.innerHTML = `
+    stage.innerHTML = `
     <svg width="100%" height="100%" viewBox="0 0 800 350">
       <rect x="300" y="150" width="200" height="200" fill="${liqColor}" opacity="0.6" stroke="${liqColor}" stroke-width="2" />
       <g transform="translate(400, 50)">
@@ -2219,44 +2250,44 @@ function updateArchiSim() {
       </g>
     </svg>
   `;
-}
-
-function checkArchimedesCalculation() {
-  const input = document.getElementById('archi-calc-fa');
-  const feed = document.getElementById('archi-feedback');
-  if (!input || !feed) return;
-
-  const rho = archiLabState.liquid === 'water' ? 1000 : 800;
-  const correct = (rho * 10 * archiLabState.vol) / 1000000;
-  const user = parseFloat(input.value);
-
-  if (Math.abs(correct - user) < 0.05) {
-    archiLabState.isSolved = true;
-    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Архимед күші табылды.</div>';
-    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
-    if (window.triggerSalute) triggerSalute();
-  } else {
-    feed.innerHTML = `<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. ρ·g·V есепте. Жауап: ${correct.toFixed(2)}</div>`;
   }
-}
 
-// Newton 1 Lab State
-let newton1LabState = {
-  v0: 10,
-  surface: 'floor',
-  mu: 0.1,
-  isSolved: false,
-  feedback: '',
-  isMoving: false
-};
+  function checkArchimedesCalculation() {
+    const input = document.getElementById('archi-calc-fa');
+    const feed = document.getElementById('archi-feedback');
+    if (!input || !feed) return;
 
-function renderNewton1Lab() {
-  setTimeout(() => {
-    updateNewton1Sim();
-    if (window.lucide) lucide.createIcons();
-  }, 100);
+    const rho = archiLabState.liquid === 'water' ? 1000 : 800;
+    const correct = (rho * 10 * archiLabState.vol) / 1000000;
+    const user = parseFloat(input.value);
 
-  return `
+    if (Math.abs(correct - user) < 0.05) {
+      archiLabState.isSolved = true;
+      feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Архимед күші табылды.</div>';
+      if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+      if (window.triggerSalute) triggerSalute();
+    } else {
+      feed.innerHTML = `<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. ρ·g·V есепте. Жауап: ${correct.toFixed(2)}</div>`;
+    }
+  }
+
+  // Newton 1 Lab State
+  let newton1LabState = {
+    v0: 10,
+    surface: 'floor',
+    mu: 0.1,
+    isSolved: false,
+    feedback: '',
+    isMoving: false
+  };
+
+  function renderNewton1Lab() {
+    setTimeout(() => {
+      updateNewton1Sim();
+      if (window.lucide) lucide.createIcons();
+    }, 100);
+
+    return `
     <div class="animate-scale-in" style="padding: 1rem;">
       <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #f8fafc; padding: 2rem; border-radius: 28px; border: 1.5px solid #e2e8f0;">
         <div>
@@ -2319,25 +2350,25 @@ function renderNewton1Lab() {
       </div>
     </div>
   `;
-}
+  }
 
-function updateNewton1Value() {
-  const v0 = parseFloat(document.getElementById('n1-v0-range').value);
-  const mu = parseFloat(document.getElementById('n1-surface').value);
-  newton1LabState.v0 = v0;
-  newton1LabState.mu = mu;
+  function updateNewton1Value() {
+    const v0 = parseFloat(document.getElementById('n1-v0-range').value);
+    const mu = parseFloat(document.getElementById('n1-surface').value);
+    newton1LabState.v0 = v0;
+    newton1LabState.mu = mu;
 
-  document.getElementById('n1-v0-val').innerText = v0 + " м/с";
-  updateNewton1Sim();
-}
+    document.getElementById('n1-v0-val').innerText = v0 + " м/с";
+    updateNewton1Sim();
+  }
 
-function updateNewton1Sim() {
-  const stage = document.getElementById('newton1-sim-stage');
-  if (!stage) return;
-  const mu = newton1LabState.mu;
-  const color = mu < 0.2 ? '#e0f2fe' : mu > 0.6 ? '#fef3c7' : '#f1f5f9';
+  function updateNewton1Sim() {
+    const stage = document.getElementById('newton1-sim-stage');
+    if (!stage) return;
+    const mu = newton1LabState.mu;
+    const color = mu < 0.2 ? '#e0f2fe' : mu > 0.6 ? '#fef3c7' : '#f1f5f9';
 
-  stage.innerHTML = `
+    stage.innerHTML = `
     <svg width="100%" height="100%" viewBox="0 0 800 350">
       <rect x="0" y="300" width="800" height="50" fill="${color}" />
       <line x1="0" y1="300" x2="800" y2="300" stroke="#94a3b8" stroke-width="2" />
@@ -2352,71 +2383,71 @@ function updateNewton1Sim() {
       </g>
     </svg>
   `;
-}
-
-function checkNewton1Calculation() {
-  const input = document.getElementById('n1-calc-d');
-  const feed = document.getElementById('n1-feedback');
-  if (!input || !feed) return;
-
-  const correct = (Math.pow(newton1LabState.v0, 2) / (2 * newton1LabState.mu * 10)).toFixed(1);
-  const user = parseFloat(input.value).toFixed(1);
-
-  if (Math.abs(correct - user) < 0.2) {
-    newton1LabState.isSolved = true;
-    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Инерция заңы дәлелденді.</div>';
-    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
-    if (window.triggerSalute) triggerSalute();
-  } else {
-    feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. d = v² / (2μg) формуласын қолдан.</div>';
   }
-}
 
-function startNewton1Anim() {
-  const car = document.getElementById('n1-car');
-  const btn = document.getElementById('n1-start-btn');
-  if (!car || !btn || btn.disabled) return;
+  function checkNewton1Calculation() {
+    const input = document.getElementById('n1-calc-d');
+    const feed = document.getElementById('n1-feedback');
+    if (!input || !feed) return;
 
-  btn.disabled = true;
-  let x = 50;
-  let v = newton1LabState.v0;
-  const a = -10 * newton1LabState.mu;
+    const correct = (Math.pow(newton1LabState.v0, 2) / (2 * newton1LabState.mu * 10)).toFixed(1);
+    const user = parseFloat(input.value).toFixed(1);
 
-  function step() {
-    v += a * 0.016;
-    if (v <= 0) {
-      btn.disabled = false;
-      setTimeout(() => car.setAttribute('transform', 'translate(50, 260)'), 2000);
-      return;
+    if (Math.abs(correct - user) < 0.2) {
+      newton1LabState.isSolved = true;
+      feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Инерция заңы дәлелденді.</div>';
+      if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+      if (window.triggerSalute) triggerSalute();
+    } else {
+      feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. d = v² / (2μg) формуласын қолдан.</div>';
     }
-    x += v;
-    if (x > 740) {
-      btn.disabled = false;
-      setTimeout(() => car.setAttribute('transform', 'translate(50, 260)'), 2000);
-      return;
+  }
+
+  function startNewton1Anim() {
+    const car = document.getElementById('n1-car');
+    const btn = document.getElementById('n1-start-btn');
+    if (!car || !btn || btn.disabled) return;
+
+    btn.disabled = true;
+    let x = 50;
+    let v = newton1LabState.v0;
+    const a = -10 * newton1LabState.mu;
+
+    function step() {
+      v += a * 0.016;
+      if (v <= 0) {
+        btn.disabled = false;
+        setTimeout(() => car.setAttribute('transform', 'translate(50, 260)'), 2000);
+        return;
+      }
+      x += v;
+      if (x > 740) {
+        btn.disabled = false;
+        setTimeout(() => car.setAttribute('transform', 'translate(50, 260)'), 2000);
+        return;
+      }
+      car.setAttribute('transform', `translate(${x}, 260)`);
+      requestAnimationFrame(step);
     }
-    car.setAttribute('transform', `translate(${x}, 260)`);
     requestAnimationFrame(step);
   }
-  requestAnimationFrame(step);
-}
 
-// Newton 2 Lab State
-let newton2LabState = {
-  force: 10,
-  mass: 2,
-  isSolved: false,
-  feedback: '',
-  isMoving: false
-};
+  // Newton 2 Lab State
+  let newton2LabState = {
+    force: 10,
+    mass: 2,
+    isSolved: false,
+    feedback: '',
+    isMoving: false
+  };
 
-function renderNewton2Lab() {
-  setTimeout(() => {
-    updateNewton2Sim();
-    if (window.lucide) lucide.createIcons();
-  }, 100);
+  function renderNewton2Lab() {
+    setTimeout(() => {
+      updateNewton2Sim();
+      if (window.lucide) lucide.createIcons();
+    }, 100);
 
-  return `
+    return `
     <div class="animate-scale-in" style="padding: 1rem;">
       <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #ecfdf5; padding: 2rem; border-radius: 28px; border: 1.5px solid #d1fae5;">
         <div>
@@ -2476,22 +2507,22 @@ function renderNewton2Lab() {
       </div>
     </div>
   `;
-}
+  }
 
-function updateNewton2Value() {
-  newton2LabState.force = parseFloat(document.getElementById('n2-force-range').value);
-  newton2LabState.mass = parseFloat(document.getElementById('n2-mass-range').value);
+  function updateNewton2Value() {
+    newton2LabState.force = parseFloat(document.getElementById('n2-force-range').value);
+    newton2LabState.mass = parseFloat(document.getElementById('n2-mass-range').value);
 
-  document.getElementById('n2-force-val').innerText = newton2LabState.force + " Н";
-  document.getElementById('n2-mass-val').innerText = newton2LabState.mass + " кг";
-  updateNewton2Sim();
-}
+    document.getElementById('n2-force-val').innerText = newton2LabState.force + " Н";
+    document.getElementById('n2-mass-val').innerText = newton2LabState.mass + " кг";
+    updateNewton2Sim();
+  }
 
-function updateNewton2Sim() {
-  const stage = document.getElementById('newton2-sim-stage');
-  if (!stage) return;
+  function updateNewton2Sim() {
+    const stage = document.getElementById('newton2-sim-stage');
+    if (!stage) return;
 
-  stage.innerHTML = `
+    stage.innerHTML = `
     <svg width="100%" height="100%" viewBox="0 0 800 350">
       <rect x="0" y="300" width="800" height="50" fill="#f1f5f9" />
       <line x1="0" y1="300" x2="800" y2="300" stroke="#94a3b8" stroke-width="2" />
@@ -2503,67 +2534,67 @@ function updateNewton2Sim() {
       </g>
     </svg>
   `;
-}
-
-function checkNewton2Calculation() {
-  const input = document.getElementById('n2-calc-a');
-  const feed = document.getElementById('n2-feedback');
-  if (!input || !feed) return;
-
-  const correct = (newton2LabState.force / newton2LabState.mass).toFixed(1);
-  const user = parseFloat(input.value).toFixed(1);
-
-  if (Math.abs(correct - user) < 0.1) {
-    newton2LabState.isSolved = true;
-    feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Үдеу дәл есептелді.</div>';
-    if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
-    if (window.triggerSalute) triggerSalute();
-  } else {
-    feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. a = F / m формуласын қолдан.</div>';
   }
-}
 
-function startNewton2Anim() {
-  const block = document.getElementById('n2-block');
-  const btn = document.getElementById('n2-start-btn');
-  if (!block || !btn || btn.disabled) return;
+  function checkNewton2Calculation() {
+    const input = document.getElementById('n2-calc-a');
+    const feed = document.getElementById('n2-feedback');
+    if (!input || !feed) return;
 
-  btn.disabled = true;
-  let x = 100;
-  let v = 0;
-  const a = newton2LabState.force / newton2LabState.mass;
+    const correct = (newton2LabState.force / newton2LabState.mass).toFixed(1);
+    const user = parseFloat(input.value).toFixed(1);
 
-  function step() {
-    v += a * 0.016;
-    x += v * 0.5;
-    if (x > 700) {
-      btn.disabled = false;
-      setTimeout(() => block.setAttribute('transform', 'translate(100, 250)'), 2000);
-      return;
+    if (Math.abs(correct - user) < 0.1) {
+      newton2LabState.isSolved = true;
+      feed.innerHTML = '<div style="color:#16a34a; font-weight:800; margin-top:0.5rem;">Дұрыс! Үдеу дәл есептелді.</div>';
+      if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+      if (window.triggerSalute) triggerSalute();
+    } else {
+      feed.innerHTML = '<div style="color:#dc2626; font-size:0.8rem; margin-top:0.5rem;">Қате. a = F / m формуласын қолдан.</div>';
     }
-    block.setAttribute('transform', `translate(${x}, 250)`);
+  }
+
+  function startNewton2Anim() {
+    const block = document.getElementById('n2-block');
+    const btn = document.getElementById('n2-start-btn');
+    if (!block || !btn || btn.disabled) return;
+
+    btn.disabled = true;
+    let x = 100;
+    let v = 0;
+    const a = newton2LabState.force / newton2LabState.mass;
+
+    function step() {
+      v += a * 0.016;
+      x += v * 0.5;
+      if (x > 700) {
+        btn.disabled = false;
+        setTimeout(() => block.setAttribute('transform', 'translate(100, 250)'), 2000);
+        return;
+      }
+      block.setAttribute('transform', `translate(${x}, 250)`);
+      requestAnimationFrame(step);
+    }
     requestAnimationFrame(step);
   }
-  requestAnimationFrame(step);
-}
 
-const hookeLabState = {
-  mass: 0.5,
-  k: 50,
-  isSolvedF: false,
-  isSolvedX: false,
-  feedbackF: '',
-  feedbackX: ''
-}
+  const hookeLabState = {
+    mass: 0.5,
+    k: 50,
+    isSolvedF: false,
+    isSolvedX: false,
+    feedbackF: '',
+    feedbackX: ''
+  }
 
 
-function renderHookeLab() {
-  setTimeout(() => {
-    updateHookeSim();
-    if (window.lucide) lucide.createIcons();
-  }, 100);
+  function renderHookeLab() {
+    setTimeout(() => {
+      updateHookeSim();
+      if (window.lucide) lucide.createIcons();
+    }, 100);
 
-  return `
+    return `
     <div class="animate-scale-in" style="padding: 1rem;">
       <!-- Lab Report Header -->
       <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 2rem; background: #f0fdf4; padding: 2rem; border-radius: 28px; border: 1.5px solid #dcfce7;">
@@ -2674,101 +2705,101 @@ function renderHookeLab() {
       </div>
     </div>
   `;
-}
-
-function updateHookeValues(prop, val) {
-  hookeLabState[prop] = parseFloat(val);
-  hookeLabState.isSolvedF = false;
-  hookeLabState.isSolvedX = false;
-  hookeLabState.feedbackF = '';
-  hookeLabState.feedbackX = '';
-
-  // Partial update UI for smoothness
-  const massVal = document.getElementById('hooke-mass-val');
-  const kVal = document.getElementById('hooke-k-val');
-  const calcMass = document.getElementById('hooke-calc-mass');
-  const feedbackF = document.getElementById('hooke-feedback-f');
-  const feedbackX = document.getElementById('hooke-feedback-x');
-
-  if (massVal) massVal.innerText = `${hookeLabState.mass} кг`;
-  if (kVal) kVal.innerText = `${hookeLabState.k} Н/м`;
-  if (calcMass) calcMass.innerText = `${hookeLabState.mass} кг`;
-  if (feedbackF) feedbackF.innerHTML = '';
-  if (feedbackX) feedbackX.innerHTML = '';
-
-  // Reset inputs and buttons
-  const inputF = document.getElementById('hooke-calc-f');
-  const inputX = document.getElementById('hooke-calc-x');
-  const btnF = document.querySelector('[onclick="checkHookeCalculation(\'F\')"]');
-  const btnX = document.querySelector('[onclick="checkHookeCalculation(\'X\')"]');
-
-  if (inputF) { inputF.disabled = false; inputF.value = ''; }
-  if (inputX) { inputX.disabled = false; inputX.value = ''; }
-  if (btnF) { btnF.disabled = false; btnF.innerText = 'ТЕКСЕРУ'; }
-  if (btnX) { btnX.disabled = false; btnX.innerText = 'ТЕКСЕРУ'; }
-
-  updateHookeSim();
-}
-
-function checkHookeCalculation(type) {
-  if (type === 'F') {
-    const input = document.getElementById('hooke-calc-f');
-    const feedbackBox = document.getElementById('hooke-feedback-f');
-    const btn = document.querySelector('[onclick="checkHookeCalculation(\'F\')"]');
-    if (!input || !feedbackBox) return;
-
-    const userVal = parseFloat(input.value);
-    const correctVal = hookeLabState.mass * 10;
-    if (Math.abs(userVal - correctVal) < 0.1) {
-      hookeLabState.isSolvedF = true;
-      hookeLabState.feedbackF = `<div class="animate-scale-in" style="color: #22c55e; font-weight: 700; margin-top: 0.5rem;">Жарайсың! Күш дұрыс.</div>`;
-      if (window.playSound) playSound('correct');
-      feedbackBox.innerHTML = hookeLabState.feedbackF;
-      input.disabled = true;
-      if (btn) { btn.disabled = true; btn.innerText = 'ДҰРЫС'; }
-    } else {
-      if (window.playSound) playSound('wrong');
-      feedbackBox.innerHTML = `<div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.5rem;">Қате. F = mg формуласын қолдан.</div>`;
-    }
-  } else if (type === 'X') {
-    const input = document.getElementById('hooke-calc-x');
-    const feedbackBox = document.getElementById('hooke-feedback-x');
-    const btn = document.querySelector('[onclick="checkHookeCalculation(\'X\')"]');
-    if (!input || !feedbackBox) return;
-
-    const userVal = parseFloat(input.value);
-    const F = hookeLabState.mass * 10;
-    const correctVal = (F / hookeLabState.k) * 100; // in cm
-
-    if (Math.abs(userVal - correctVal) < 0.5) {
-      hookeLabState.isSolvedX = true;
-      hookeLabState.feedbackX = `<div class="animate-scale-in" style="color: #3b82f6; font-weight: 700; margin-top: 0.5rem;">Керемет! Ұзару дәл табылды.</div>`;
-      if (window.playSound) playSound('correct');
-      if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
-      if (window.triggerSalute) triggerSalute();
-      feedbackBox.innerHTML = hookeLabState.feedbackX;
-      input.disabled = true;
-      if (btn) { btn.disabled = true; btn.innerText = 'ДҰРЫС'; }
-    } else {
-      if (window.playSound) playSound('wrong');
-      feedbackBox.innerHTML = `<div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.5rem;">Қате. x = F / k формуласын қолдан. Нәтижені см-ге айналдыр.</div>`;
-    }
   }
-  if (window.lucide) lucide.createIcons();
-}
 
-function updateHookeSim() {
-  const stage = document.getElementById('hooke-sim-stage');
-  if (!stage) return;
+  function updateHookeValues(prop, val) {
+    hookeLabState[prop] = parseFloat(val);
+    hookeLabState.isSolvedF = false;
+    hookeLabState.isSolvedX = false;
+    hookeLabState.feedbackF = '';
+    hookeLabState.feedbackX = '';
 
-  const m = hookeLabState.mass;
-  const k = hookeLabState.k;
-  const g = 10;
-  const stretch = (m * g / k) * 1000; // 1000px per meter (0.1m = 100px)
-  const springHeight = 80 + stretch;
-  const weightSize = 40 + (m * 20);
+    // Partial update UI for smoothness
+    const massVal = document.getElementById('hooke-mass-val');
+    const kVal = document.getElementById('hooke-k-val');
+    const calcMass = document.getElementById('hooke-calc-mass');
+    const feedbackF = document.getElementById('hooke-feedback-f');
+    const feedbackX = document.getElementById('hooke-feedback-x');
 
-  stage.innerHTML = `
+    if (massVal) massVal.innerText = `${hookeLabState.mass} кг`;
+    if (kVal) kVal.innerText = `${hookeLabState.k} Н/м`;
+    if (calcMass) calcMass.innerText = `${hookeLabState.mass} кг`;
+    if (feedbackF) feedbackF.innerHTML = '';
+    if (feedbackX) feedbackX.innerHTML = '';
+
+    // Reset inputs and buttons
+    const inputF = document.getElementById('hooke-calc-f');
+    const inputX = document.getElementById('hooke-calc-x');
+    const btnF = document.querySelector('[onclick="checkHookeCalculation(\'F\')"]');
+    const btnX = document.querySelector('[onclick="checkHookeCalculation(\'X\')"]');
+
+    if (inputF) { inputF.disabled = false; inputF.value = ''; }
+    if (inputX) { inputX.disabled = false; inputX.value = ''; }
+    if (btnF) { btnF.disabled = false; btnF.innerText = 'ТЕКСЕРУ'; }
+    if (btnX) { btnX.disabled = false; btnX.innerText = 'ТЕКСЕРУ'; }
+
+    updateHookeSim();
+  }
+
+  function checkHookeCalculation(type) {
+    if (type === 'F') {
+      const input = document.getElementById('hooke-calc-f');
+      const feedbackBox = document.getElementById('hooke-feedback-f');
+      const btn = document.querySelector('[onclick="checkHookeCalculation(\'F\')"]');
+      if (!input || !feedbackBox) return;
+
+      const userVal = parseFloat(input.value);
+      const correctVal = hookeLabState.mass * 10;
+      if (Math.abs(userVal - correctVal) < 0.1) {
+        hookeLabState.isSolvedF = true;
+        hookeLabState.feedbackF = `<div class="animate-scale-in" style="color: #22c55e; font-weight: 700; margin-top: 0.5rem;">Жарайсың! Күш дұрыс.</div>`;
+        if (window.playSound) playSound('correct');
+        feedbackBox.innerHTML = hookeLabState.feedbackF;
+        input.disabled = true;
+        if (btn) { btn.disabled = true; btn.innerText = 'ДҰРЫС'; }
+      } else {
+        if (window.playSound) playSound('wrong');
+        feedbackBox.innerHTML = `<div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.5rem;">Қате. F = mg формуласын қолдан.</div>`;
+      }
+    } else if (type === 'X') {
+      const input = document.getElementById('hooke-calc-x');
+      const feedbackBox = document.getElementById('hooke-feedback-x');
+      const btn = document.querySelector('[onclick="checkHookeCalculation(\'X\')"]');
+      if (!input || !feedbackBox) return;
+
+      const userVal = parseFloat(input.value);
+      const F = hookeLabState.mass * 10;
+      const correctVal = (F / hookeLabState.k) * 100; // in cm
+
+      if (Math.abs(userVal - correctVal) < 0.5) {
+        hookeLabState.isSolvedX = true;
+        hookeLabState.feedbackX = `<div class="animate-scale-in" style="color: #3b82f6; font-weight: 700; margin-top: 0.5rem;">Керемет! Ұзару дәл табылды.</div>`;
+        if (window.playSound) playSound('correct');
+        if (window.onInteractiveLabSuccess) window.onInteractiveLabSuccess();
+        if (window.triggerSalute) triggerSalute();
+        feedbackBox.innerHTML = hookeLabState.feedbackX;
+        input.disabled = true;
+        if (btn) { btn.disabled = true; btn.innerText = 'ДҰРЫС'; }
+      } else {
+        if (window.playSound) playSound('wrong');
+        feedbackBox.innerHTML = `<div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.5rem;">Қате. x = F / k формуласын қолдан. Нәтижені см-ге айналдыр.</div>`;
+      }
+    }
+    if (window.lucide) lucide.createIcons();
+  }
+
+  function updateHookeSim() {
+    const stage = document.getElementById('hooke-sim-stage');
+    if (!stage) return;
+
+    const m = hookeLabState.mass;
+    const k = hookeLabState.k;
+    const g = 10;
+    const stretch = (m * g / k) * 1000; // 1000px per meter (0.1m = 100px)
+    const springHeight = 80 + stretch;
+    const weightSize = 40 + (m * 20);
+
+    stage.innerHTML = `
     <svg class="lab-svg" width="100%" height="100%" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet">
 
       <defs>
@@ -2807,120 +2838,119 @@ function updateHookeSim() {
       </g>
     </svg>
   `;
-}
-
-function generateSpringPath(height) {
-  const turns = 15;
-  const radius = 20;
-  const step = height / turns;
-  let p = "M 0 0";
-  for (let i = 0; i < turns; i++) {
-    p += ` L ${radius} ${i * step + step / 4} L ${-radius} ${i * step + 3 * step / 4} L 0 ${i * step + step}`;
   }
-  return p;
-}
 
-const physicsKnowledgeBase = {
-  'ньютон': 'Исаак Ньютон физиканың негізін қалаушылардың бірі. Оның 3 заңы бар:\n1. Инерция заңы: егер денеге күш әсер етпесе, ол тыныштықта болады.\n2. Динамика заңы: Күш үдеуге тура пропорционал: F = m·a.\n3. Әсер және қарсы әсер заңы: Әсер етуші күшке әрқашан тең және қарама-қарсы бағытталған қарсы әсер етуші күш болады.',
-  'ом': 'Ом заңы: Тізбек бөлігіндегі ток күші кернеуге тура пропорционал және кедергіге кері пропорционал. Формуласы: I = U / R.',
-  'энергия': 'Энергия — дененің жұмыс істеу қабілетін сипаттайтын шама. Негізгі түрлері: Кинетикалық (E = m·v²/2) және Потенциалдық (E = m·g·h). Энергия жоғалмайды, ол тек бір түрден екінші түрге айналады.',
-  'паскаль': 'Паскаль заңы бойынша: Сұйыққа немесе газға түсірілген қысым барлық бағытқа өзгеріссіз беріледі. Өлшем бірлігі - Паскаль (Па).',
-  'жылдамдық': 'Жылдамдық — дененің уақыт бірлігінде жүріп өткен жолын сипаттайды. Формуласы: v = s / t. Өлшем бірлігі: м/с.',
-  'күш': 'Күш — денелердің өзара әрекеттесуін сипаттайтын шама. Ол векторлық шама болып табылады. Бірлігі — Ньютон (Н).',
-  'масса': 'Масса — дененің инерттілігінің және гравитациялық әрекеттесуінің өлшемі. Негізгі бірлігі — килограмм (кг).',
-  'қысым': 'Қысым — бетке перпендикуляр бағытта әсер ететін күштің сол беттің ауданына қатынасы. P = F / S.',
-  'фотоэффект': 'Фотоэффект — жарық сәулелерінің әсерінен заттан электрондардың ұшып шығу құбылысы. Оны Эйнштейн 1905 жылы түсіндіріп берді.',
-  'линза': 'Линза — жарық сәулелерін сындырып, кескін алуға мүмкіндік беретін мөлдір дене. Жинағыш және шашыратқыш болып бөлінеді.',
-  'атом': 'Атом — заттың химиялық жағынан бөлінбейтін ең кіші бөлшегі. Ол оң зарядталған ядродан және теріс зарядталған электрондардан тұрады.',
-  'электр': 'Электр тогы — зарядталған бөлшектердің реттелген қозғалысы. Ток күші Ампермен (А) өлшенеді.',
-  'сәлем': 'Сәлем! Мен саған физиканы түсінуге көмектесетін AI ассистентпін. Қандай сұрағың бар?',
-  'саламатсыз ба': 'Сәлеметсіз бе! Физика пәні бойынша қандай түсініксіз сұрақтар бар?',
-  'рахмет': 'Оқасы жоқ! Физиканы үйренуде жетістіктер тілеймін!'
-};
-
-function initSnowfall() {
-  const container = document.getElementById('snow-container');
-  if (!container) return;
-
-  const flakeCount = 50;
-  for (let i = 0; i < flakeCount; i++) {
-    const flake = document.createElement('div');
-    flake.className = 'snowflake';
-
-    // Randomize properties for a natural feel
-    const size = Math.random() * 4 + 2 + 'px';
-    const left = Math.random() * 100 + 'vw';
-    const duration = Math.random() * 10 + 10 + 's';
-    const delay = Math.random() * 20 + 's';
-    const opacity = Math.random() * 0.5 + 0.3;
-
-    flake.style.width = size;
-    flake.style.height = size;
-    flake.style.left = left;
-    flake.style.animation = `snowfall ${duration} linear ${delay} infinite`;
-    flake.style.opacity = opacity;
-
-    container.appendChild(flake);
-  }
-}
-
-// Initial state
-window.onload = () => {
-  if (state.view && state.view !== 'home') {
-    navigate(state.view, false);
-  } else {
-    navigate('home', false);
-  }
-  initSnowfall();
-};
-
-
-
-
-
-// Calculator Logic
-let calcCurrent = '0';
-
-function pressCalc(btn) {
-  const display = document.getElementById('calc-display');
-  if (!display) return;
-
-  if (btn === 'C') {
-    calcCurrent = '0';
-  } else if (btn === '=') {
-    try {
-      // Basic math evaluation
-      let expression = calcCurrent.replace(/×/g, '*');
-      // Using a safer evaluation method
-      calcCurrent = eval(expression).toString();
-
-      if (calcCurrent.length > 10) {
-        calcCurrent = parseFloat(calcCurrent).toPrecision(8);
-      }
-    } catch (e) {
-      calcCurrent = 'Қате';
+  function generateSpringPath(height) {
+    const turns = 15;
+    const radius = 20;
+    const step = height / turns;
+    let p = "M 0 0";
+    for (let i = 0; i < turns; i++) {
+      p += ` L ${radius} ${i * step + step / 4} L ${-radius} ${i * step + 3 * step / 4} L 0 ${i * step + step}`;
     }
-  } else {
-    if (calcCurrent === '0' || calcCurrent === 'Қате') {
-      calcCurrent = btn;
+    return p;
+  }
+
+  const physicsKnowledgeBase = {
+    'ньютон': 'Исаак Ньютон физиканың негізін қалаушылардың бірі. Оның 3 заңы бар:\n1. Инерция заңы: егер денеге күш әсер етпесе, ол тыныштықта болады.\n2. Динамика заңы: Күш үдеуге тура пропорционал: F = m·a.\n3. Әсер және қарсы әсер заңы: Әсер етуші күшке әрқашан тең және қарама-қарсы бағытталған қарсы әсер етуші күш болады.',
+    'ом': 'Ом заңы: Тізбек бөлігіндегі ток күші кернеуге тура пропорционал және кедергіге кері пропорционал. Формуласы: I = U / R.',
+    'энергия': 'Энергия — дененің жұмыс істеу қабілетін сипаттайтын шама. Негізгі түрлері: Кинетикалық (E = m·v²/2) және Потенциалдық (E = m·g·h). Энергия жоғалмайды, ол тек бір түрден екінші түрге айналады.',
+    'паскаль': 'Паскаль заңы бойынша: Сұйыққа немесе газға түсірілген қысым барлық бағытқа өзгеріссіз беріледі. Өлшем бірлігі - Паскаль (Па).',
+    'жылдамдық': 'Жылдамдық — дененің уақыт бірлігінде жүріп өткен жолын сипаттайды. Формуласы: v = s / t. Өлшем бірлігі: м/с.',
+    'күш': 'Күш — денелердің өзара әрекеттесуін сипаттайтын шама. Ол векторлық шама болып табылады. Бірлігі — Ньютон (Н).',
+    'масса': 'Масса — дененің инерттілігінің және гравитациялық әрекеттесуінің өлшемі. Негізгі бірлігі — килограмм (кг).',
+    'қысым': 'Қысым — бетке перпендикуляр бағытта әсер ететін күштің сол беттің ауданына қатынасы. P = F / S.',
+    'фотоэффект': 'Фотоэффект — жарық сәулелерінің әсерінен заттан электрондардың ұшып шығу құбылысы. Оны Эйнштейн 1905 жылы түсіндіріп берді.',
+    'линза': 'Линза — жарық сәулелерін сындырып, кескін алуға мүмкіндік беретін мөлдір дене. Жинағыш және шашыратқыш болып бөлінеді.',
+    'атом': 'Атом — заттың химиялық жағынан бөлінбейтін ең кіші бөлшегі. Ол оң зарядталған ядродан және теріс зарядталған электрондардан тұрады.',
+    'электр': 'Электр тогы — зарядталған бөлшектердің реттелген қозғалысы. Ток күші Ампермен (А) өлшенеді.',
+    'сәлем': 'Сәлем! Мен саған физиканы түсінуге көмектесетін AI ассистентпін. Қандай сұрағың бар?',
+    'саламатсыз ба': 'Сәлеметсіз бе! Физика пәні бойынша қандай түсініксіз сұрақтар бар?',
+    'рахмет': 'Оқасы жоқ! Физиканы үйренуде жетістіктер тілеймін!'
+  };
+
+  function initSnowfall() {
+    const container = document.getElementById('snow-container');
+    if (!container) return;
+
+    const flakeCount = 50;
+    for (let i = 0; i < flakeCount; i++) {
+      const flake = document.createElement('div');
+      flake.className = 'snowflake';
+
+      // Randomize properties for a natural feel
+      const size = Math.random() * 4 + 2 + 'px';
+      const left = Math.random() * 100 + 'vw';
+      const duration = Math.random() * 10 + 10 + 's';
+      const delay = Math.random() * 20 + 's';
+      const opacity = Math.random() * 0.5 + 0.3;
+
+      flake.style.width = size;
+      flake.style.height = size;
+      flake.style.left = left;
+      flake.style.animation = `snowfall ${duration} linear ${delay} infinite`;
+      flake.style.opacity = opacity;
+
+      container.appendChild(flake);
+    }
+  }
+
+  // Initial state
+  window.onload = () => {
+    if (state.view && state.view !== 'home') {
+      navigate(state.view, false);
     } else {
-      calcCurrent += btn;
+      navigate('home', false);
+    }
+    initSnowfall();
+  };
+
+
+
+
+
+  // Calculator Logic
+  let calcCurrent = '0';
+
+  function pressCalc(btn) {
+    const display = document.getElementById('calc-display');
+    if (!display) return;
+
+    if (btn === 'C') {
+      calcCurrent = '0';
+    } else if (btn === '=') {
+      try {
+        // Basic math evaluation
+        let expression = calcCurrent.replace(/×/g, '*');
+        // Using a safer evaluation method
+        calcCurrent = eval(expression).toString();
+
+        if (calcCurrent.length > 10) {
+          calcCurrent = parseFloat(calcCurrent).toPrecision(8);
+        }
+      } catch (e) {
+        calcCurrent = 'Қате';
+      }
+    } else {
+      if (calcCurrent === '0' || calcCurrent === 'Қате') {
+        calcCurrent = btn;
+      } else {
+        calcCurrent += btn;
+      }
+    }
+    display.innerText = calcCurrent;
+  }
+
+  function toggleCalculator() {
+    const modal = document.getElementById('calc-modal');
+    if (!modal) return;
+
+    if (modal.style.display === 'none' || modal.style.display === '') {
+      modal.style.display = 'flex';
+    } else {
+      modal.style.display = 'none';
     }
   }
-  display.innerText = calcCurrent;
-}
-
-function toggleCalculator() {
-  const modal = document.getElementById('calc-modal');
-  if (!modal) return;
-
-  if (modal.style.display === 'none' || modal.style.display === '') {
-    modal.style.display = 'flex';
-  } else {
-    modal.style.display = 'none';
-  }
-}
-
 
 
 

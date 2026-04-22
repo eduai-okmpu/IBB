@@ -16,7 +16,6 @@
  */
 
 const USERS_SHEET_NAME = "Users";
-const USERS_SHEET_NAME = "Users";
 
 function doPost(e) {
   try {
@@ -72,6 +71,8 @@ function processAction(data) {
     return handleChat(data);
   } else if (action === 'saveScore') {
     return handleSaveScore(data);
+  } else if (action === 'updateProfile') {
+    return handleUpdateProfile(data);
   } else {
     return createResponse({ success: false, message: 'Invalid action: ' + action });
   }
@@ -222,7 +223,12 @@ function handleListUsers(data) {
     const row = dataRange[i];
     const user = {};
     for (let j = 0; j < headers.length; j++) {
-      user[headers[j].toLowerCase()] = row[j];
+      let key = String(headers[j] || '').toLowerCase().trim();
+      // Fallback for unnamed column 14 (LessonProgress)
+      if (!key && j === 13) key = 'lessonprogress';
+      else if (!key) key = 'column_' + j;
+      
+      user[key] = row[j];
     }
     users.push(user);
   }
@@ -257,7 +263,7 @@ function handleRegister(data) {
   
   if (!sheet) {
     sheet = ss.insertSheet(USERS_SHEET_NAME);
-    sheet.appendRow(['Name', 'Email', 'Password', 'Role', 'Created At']);
+    sheet.appendRow(['Name', 'Email', 'Password', 'Role', 'Created At', 'Score', 'Inventory', 'ActiveFrame', 'ActiveIcon', 'ActiveTitle', 'Achievements', 'SpentPoints', 'AssignmentPoints', 'LessonProgress']);
   }
 
   const email = String(data.email || '').toLowerCase();
@@ -276,10 +282,19 @@ function handleRegister(data) {
     email,
     data.password || '',
     data.role || 'student',
-    new Date()
+    new Date(),
+    0, // Score
+    '[]', // Inventory
+    '', // ActiveFrame
+    '', // ActiveIcon
+    '', // ActiveTitle
+    '[]', // Achievements
+    0, // SpentPoints
+    0, // AssignmentPoints
+    '{}' // LessonProgress
   ]);
 
-  return createResponse({ success: true, user: { name: data.name || '', role: data.role || 'student' } });
+  return createResponse({ success: true, user: { name: data.name || '', role: data.role || 'student', score: 0 } });
 }
 
 function handleLogin(data) {
@@ -306,7 +321,15 @@ function handleLogin(data) {
         user: { 
           name: rows[i][0], 
           role: rows[i][3],
-          score: parseInt(rows[i][5]) || 0
+          score: parseInt(rows[i][5]) || 0,
+          inventory: rows[i][6] ? JSON.parse(rows[i][6]) : [],
+          activeFrame: rows[i][7] || '',
+          activeIcon: rows[i][8] || '',
+          activeTitle: rows[i][9] || '',
+          achievements: rows[i][10] ? JSON.parse(rows[i][10]) : [],
+          spentPoints: parseInt(rows[i][11]) || 0,
+          assignmentPoints: parseInt(rows[i][12]) || 0,
+          lessonProgress: rows[i][13] ? JSON.parse(rows[i][13]) : {}
         } 
       });
     }
@@ -333,17 +356,42 @@ function handleSaveScore(data) {
   const dataRange = sheet.getDataRange();
   const rows = dataRange.getValues();
   
-  // Ensure header has Score
-  if (rows[0].length < 6 || rows[0][5] !== 'Score') {
-    sheet.getRange(1, 6).setValue('Score');
-  }
-
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][1]).toLowerCase() === email) {
       let currentScore = parseInt(rows[i][5]) || 0;
       let newScore = currentScore + scoreToAdd;
       sheet.getRange(i + 1, 6).setValue(newScore);
       return createResponse({ success: true, newScore: newScore });
+    }
+  }
+  
+  return createResponse({ success: false, message: 'Пайдаланушы табылмады' });
+}
+
+function handleUpdateProfile(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(USERS_SHEET_NAME);
+  if (!sheet) return createResponse({ success: false, message: 'Sheet not found' });
+
+  const email = String(data.email || '').toLowerCase();
+  if (!email) return createResponse({ success: false, message: 'email is required' });
+  
+  const dataRange = sheet.getDataRange();
+  const rows = dataRange.getValues();
+  
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][1]).toLowerCase() === email) {
+      if (data.name !== undefined) sheet.getRange(i + 1, 1).setValue(data.name);
+      if (data.inventory !== undefined) sheet.getRange(i + 1, 7).setValue(JSON.stringify(data.inventory));
+      if (data.activeFrame !== undefined) sheet.getRange(i + 1, 8).setValue(data.activeFrame);
+      if (data.activeIcon !== undefined) sheet.getRange(i + 1, 9).setValue(data.activeIcon);
+      if (data.activeTitle !== undefined) sheet.getRange(i + 1, 10).setValue(data.activeTitle);
+      if (data.achievements !== undefined) sheet.getRange(i + 1, 11).setValue(JSON.stringify(data.achievements));
+      if (data.spentPoints !== undefined) sheet.getRange(i + 1, 12).setValue(data.spentPoints);
+      if (data.assignmentPoints !== undefined) sheet.getRange(i + 1, 13).setValue(data.assignmentPoints);
+      if (data.lessonProgress !== undefined) sheet.getRange(i + 1, 14).setValue(JSON.stringify(data.lessonProgress));
+      
+      return createResponse({ success: true, message: 'Профиль жаңартылды' });
     }
   }
   
